@@ -24,7 +24,7 @@ body {
     top: 0;
     right: 0;
     width: 250px;
-    height: 100vh;
+    height: 95vh;
     background-color: var(--secondary-bg);
     color: var(--text-color);
     display: flex;
