@@ -1,75 +1,23 @@
-<style>
-    body {
-  margin: 0;
-  font-family: "Vazirmatn", sans-serif;
-  display: flex;
-}
-
-.sidebar {
-  width: 250px;
-  min-height: 100vh;
-  background: #222;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1rem;
-}
-
-.sidebar .date-box {
-  text-align: center;
-  font-weight: bold;
-  margin-bottom: 1rem;
-}
-
-.sidebar nav {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sidebar nav a,
-.sidebar .support a {
-  color: #fff;
-  text-decoration: none;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background 0.3s;
-}
-
-.sidebar nav a:hover,
-.sidebar .support a:hover {
-  background: #444;
-}
-
-</style>
 
 
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="css/sidebar.css">
 
-
-
-
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="date-box">
     <span id="persian-date"></span>
   </div>
   <nav>
-    <a href="dashboard.php">داشبورد</a>
-    <a href="products.php">محصولات</a>
-    <a href="payments.php">پرداختی‌ها</a>
-    <a href="invoices.php">فاکتورها</a>
+    <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i><span>داشبورد</span></a>
+    <a href="products.php"><i class="fas fa-box"></i><span>محصولات</span></a>
+    <a href="payments.php"><i class="fas fa-credit-card"></i><span>پرداختی‌ها</span></a>
+    <a href="invoices.php"><i class="fas fa-file-invoice"></i><span>فاکتورها</span></a>
   </nav>
   <div class="support">
-    <a href="support.php">پشتیبانی</a>
+    <a href="support.php"><i class="fas fa-headset"></i><span>پشتیبانی</span></a>
   </div>
 </aside>
 
 <script src="https://cdn.jsdelivr.net/npm/jalaali-js/dist/jalaali.min.js"></script>
-<script>
-  function toJalali(date) {
-    let gDate = new Date(date);
-    let j = jalaali.toJalaali(gDate.getFullYear(), gDate.getMonth() + 1, gDate.getDate());
-    return `${j.jy}/${j.jm}/${j.jd}`;
-  }
-  document.getElementById("persian-date").innerText = toJalali(new Date());
-</script>
+<script src="js/sidebar.js"></script>

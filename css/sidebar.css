@@ -1,0 +1,114 @@
+/* Professional Office-Style Sidebar */
+:root {
+    --primary-bg: #f8f9fa;
+    --secondary-bg: #ffffff;
+    --accent-color: #007bff;
+    --text-color: #495057;
+    --hover-bg: #e9ecef;
+    --border-radius: 8px;
+    --font-family: 'Peyda', sans-serif;
+}
+
+body {
+    margin: 0;
+    display: flex;
+    direction: rtl;
+    background: linear-gradient(135deg, #ffffff 0%, #e9ecef 100%);
+    font-family: var(--font-family);
+}
+
+.sidebar {
+    width: 250px;
+    max-height: 100vh;
+    background-color: var(--secondary-bg);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    transition: width 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.sidebar.collapsed {
+    width: 70px;
+    position: relative;
+}
+
+.sidebar .toggle-btn {
+    position: absolute;
+    top: 40px;
+    right: 40px;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: color 0.3s;
+    z-index: 10;
+}
+
+.sidebar .toggle-btn:hover {
+    color: var(--accent-color);
+}
+
+.sidebar .date-box {
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 2rem;
+    padding: 1rem;
+
+}
+
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    width: 90%;
+}
+
+.sidebar nav a,
+.sidebar .support a {
+    color: var(--text-color);
+    text-decoration: none;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-weight: 500;
+}
+
+.sidebar nav a:hover,
+.sidebar .support a:hover {
+    background: var(--hover-bg);
+    color: var(--accent-color);
+}
+
+.sidebar.collapsed nav a,
+.sidebar.collapsed .support a {
+    justify-content: center;
+    padding: 1rem 0;
+    pointer-events: none;
+}
+
+.sidebar.collapsed nav a span,
+.sidebar.collapsed .support a span {
+    display: none;
+}
+
+.sidebar.collapsed .date-box {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        position: fixed;
+        max-height: 100vh;
+        z-index: 1000;
+        border-radius: 0;
+    }
+}

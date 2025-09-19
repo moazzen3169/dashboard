@@ -1,0 +1,117 @@
+/* Design System for Enterprise Management Dashboard */
+
+/* Light Theme */
+:root {
+  /* Colors */
+  --color-bg: #F7F8FA;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F3F4F6;
+  --color-text-strong: #0B1021;
+  --color-text: #1F2937;
+  --color-text-muted: #6B7280;
+  --color-border: #E5E7EB;
+  --color-accent: #5B7CFF;
+
+  /* Semantic */
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-danger: #DC2626;
+  --color-info: #06B6D4;
+
+  /* Shadows */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.06), 0 1px 1px rgba(0,0,0,0.04);
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.16);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 1000px;
+
+  /* Spacing */
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Typography */
+  --font-family: 'Inter', system-ui, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --line-height-body: 1.5;
+  --line-height-heading: 1.3;
+  --line-height-large: 1.2;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --color-bg: #0B0F15;
+  --color-surface: #111826;
+  --color-surface-subtle: #0E1420;
+  --color-text-strong: #F3F4F6;
+  --color-text: #E5E7EB;
+  --color-text-muted: #9CA3AF;
+  --color-border: #1F2A37;
+}
+
+/* Typography Classes */
+.h1 { font-size: var(--font-size-xl); font-weight: 600; line-height: var(--line-height-heading); color: var(--color-text-strong); }
+.h2 { font-size: var(--font-size-lg); font-weight: 600; line-height: var(--line-height-heading); color: var(--color-text-strong); }
+.h3 { font-size: var(--font-size-md); font-weight: 600; line-height: var(--line-height-heading); color: var(--color-text-strong); }
+.body { font-size: var(--font-size-sm); font-weight: 400; line-height: var(--line-height-body); color: var(--color-text); }
+.body-strong { font-size: var(--font-size-sm); font-weight: 500; line-height: var(--line-height-body); color: var(--color-text); }
+.kpi-value { font-size: var(--font-size-2xl); font-weight: 600; line-height: var(--line-height-large); color: var(--color-accent); }
+
+/* Layout */
+.dashboard-container { display: flex; min-height: 100vh; background: var(--color-bg); direction: rtl; }
+.sidebar { width: 250px; background: var(--color-surface); border-left: 1px solid var(--color-border); }
+.main-content { flex: 1; padding: var(--space-xl); }
+.top-bar { height: 64px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-xl); }
+.content-area { padding: var(--space-xl); }
+
+/* KPI Cards */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-md); }
+.kpi-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); box-shadow: var(--shadow-1); text-align: center; transition: box-shadow 0.2s ease; position: relative; }
+.kpi-card:hover { box-shadow: var(--shadow-2); }
+.kpi-card h3 { margin: 0 0 var(--space-sm) 0; color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: 500; }
+.kpi-card .value { margin: 0; color: var(--color-accent); font-size: var(--font-size-2xl); font-weight: 600; }
+.kpi-icon { position: absolute; top: var(--space-sm); right: var(--space-sm); font-size: var(--font-size-lg); color: var(--color-accent); }
+.kpi-change { font-size: var(--font-size-sm); font-weight: 500; margin: var(--space-xs) 0 0 0; }
+.kpi-change.positive { color: var(--color-success); }
+.kpi-change.negative { color: var(--color-danger); }
+.kpi-change.zero { color: var(--color-text); }
+
+/* Charts */
+.chart-container { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-1); margin-top: var(--space-xl); }
+
+/* Buttons */
+.btn-primary { background: var(--color-accent); color: white; border: none; border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; transition: background 0.2s ease; }
+.btn-primary:hover { background: #4A6BFF; }
+.btn-secondary { background: transparent; color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md); font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; transition: background 0.2s ease; }
+.btn-secondary:hover { background: var(--color-surface-subtle); }
+
+/* Tables */
+.table { width: 100%; border-collapse: collapse; background: var(--color-surface); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-1); }
+.table th, .table td { border: 1px solid var(--color-border); padding: var(--space-md); text-align: center; color: var(--color-text); }
+.table th { background: var(--color-surface-subtle); font-weight: 600; }
+.table tr:nth-child(even) { background: var(--color-surface-subtle); }
+.table tr:hover { background: var(--color-bg); }
+
+/* Forms */
+.form-group { margin-bottom: var(--space-md); }
+.form-label { display: block; margin-bottom: var(--space-xs); color: var(--color-text); font-size: var(--font-size-sm); font-weight: 500; }
+.form-input { width: 100%; padding: var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font-size: var(--font-size-sm); }
+.form-input:focus { border-color: var(--color-accent); outline: none; }
+
+/* Responsive */
+@media (max-width: 1024px) { .sidebar { width: 240px; } }
+@media (max-width: 768px) { .sidebar { width: 200px; } .kpi-grid { grid-template-columns: 1fr; } .top-bar { padding: 0 var(--space-md); } .main-content { padding: var(--space-md); } }
+@media (max-width: 480px) { .sidebar { display: none; } .top-bar { height: 56px; } }
+
+/* Accessibility */
+.btn:focus, .form-input:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
