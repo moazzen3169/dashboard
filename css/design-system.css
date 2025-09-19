@@ -69,22 +69,17 @@
 
 /* Layout */
 .dashboard-container { display: flex; min-height: 100vh; background: var(--color-bg); direction: rtl; }
-.sidebar { width: 250px; background: var(--color-surface); border-left: 1px solid var(--color-border); }
+.sidebar { width: 280px; background: var(--color-surface); border-left: 1px solid var(--color-border); }
 .main-content { flex: 1; padding: var(--space-xl); }
 .top-bar { height: 64px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-xl); }
 .content-area { padding: var(--space-xl); }
 
 /* KPI Cards */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-md); }
-.kpi-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-md); box-shadow: var(--shadow-1); text-align: center; transition: box-shadow 0.2s ease; position: relative; }
+.kpi-grid { display: grid; grid-template-columns: repeat(3 , 1fr); gap: var(--space-md); }
+.kpi-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-1); text-align: center; transition: box-shadow 0.2s ease; }
 .kpi-card:hover { box-shadow: var(--shadow-2); }
 .kpi-card h3 { margin: 0 0 var(--space-sm) 0; color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: 500; }
 .kpi-card .value { margin: 0; color: var(--color-accent); font-size: var(--font-size-2xl); font-weight: 600; }
-.kpi-icon { position: absolute; top: var(--space-sm); right: var(--space-sm); font-size: var(--font-size-lg); color: var(--color-accent); }
-.kpi-change { font-size: var(--font-size-sm); font-weight: 500; margin: var(--space-xs) 0 0 0; }
-.kpi-change.positive { color: var(--color-success); }
-.kpi-change.negative { color: var(--color-danger); }
-.kpi-change.zero { color: var(--color-text); }
 
 /* Charts */
 .chart-container { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-lg); box-shadow: var(--shadow-1); margin-top: var(--space-xl); }

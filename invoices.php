@@ -1,5 +1,6 @@
 <?php
 include 'db.php'; // اتصال به دیتابیس
+include 'jalali_calendar.php'; // توابع تبدیل تاریخ شمسی
 
 function getMonthlyProducts($conn) {
     try {

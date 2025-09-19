@@ -15,38 +15,11 @@ body {
     font-family: var(--font-family);
     background: var(--primary-bg);
     color: var(--text-color);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.table th, .table td {
-    border: 1px solid var(--border-color);
-    padding: 12px;
-    text-align: center;
-}
-
-.table th {
-    background: var(--accent-color);
-    color: white;
-    font-weight: 600;
-}
-
-.table tr:nth-child(even) {
-    background: var(--hover-bg);
-}
-
-.table tr:hover {
-    background: var(--primary-bg);
-}
-
+/* Buttons */
 .btn {
     background: var(--accent-color);
     color: white;
@@ -56,6 +29,9 @@ body {
     cursor: pointer;
     margin-bottom: 15px;
     transition: background 0.3s ease;
+    -webkit-transition: background 0.3s ease;
+    -moz-transition: background 0.3s ease;
+    -o-transition: background 0.3s ease;
 }
 
 .btn:hover {
@@ -70,6 +46,9 @@ body {
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: background 0.3s ease;
+    -webkit-transition: background 0.3s ease;
+    -moz-transition: background 0.3s ease;
+    -o-transition: background 0.3s ease;
 }
 
 .btn-small:hover {
@@ -139,4 +118,46 @@ body {
     padding: 10px;
     border-radius: var(--border-radius);
     margin-bottom: 20px;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--secondary-bg);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    text-align: center;
+    font-family: var(--font-family);
+    color: var(--text-color);
+}
+
+.modal-content h2 {
+    margin-bottom: 15px;
+}
+
+.modal .form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.modal .form-row {
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modal.active {
+    display: flex;
 }

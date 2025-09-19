@@ -1,5 +1,13 @@
 <?php
 include 'db.php';
+include 'jalali_calendar.php'; // توابع تبدیل تاریخ شمسی
+
+// Convert Gregorian date to Jalali string
+function formatJalaliDate($gregorianDate) {
+    list($gy, $gm, $gd) = explode('-', $gregorianDate);
+    $jalali = gregorian_to_jalali($gy, $gm, $gd);
+    return sprintf('%04d/%02d/%02d', $jalali[0], $jalali[1], $jalali[2]);
+}
 
 function getProductsByMonth($conn, $year, $month) {
     try {
@@ -111,7 +119,7 @@ foreach ($products as $product) {
             <td><?php echo htmlspecialchars($product['id']); ?></td>
             <td><?php echo htmlspecialchars($product['name']); ?></td>
             <td><?php echo number_format($product['price']); ?></td>
-            <td><?php echo htmlspecialchars($product['sale_date']); ?></td>
+            <td><?php echo htmlspecialchars(formatJalaliDate($product['sale_date'])); ?></td>
           </tr>
           <?php endforeach; ?>
         </tbody>

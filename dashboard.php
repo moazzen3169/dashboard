@@ -1,5 +1,6 @@
 <?php
 include 'db.php'; // اتصال به دیتابیس
+include 'jalali_calendar.php'; // توابع تبدیل تاریخ شمسی
 
 // Function to get KPI data
 function getKpiData($conn, $table, $column, $dateCondition) {
@@ -14,15 +15,27 @@ function getKpiData($conn, $table, $column, $dateCondition) {
     }
 }
 
-// Function to get monthly sales data for chart
 function getMonthlySalesData($conn) {
     try {
-        $data = [];
-        for ($month = 1; $month <= 12; $month++) {
-            $stmt = $conn->prepare("SELECT SUM(price) as total FROM products WHERE MONTH(sale_date) = ? AND YEAR(sale_date) = YEAR(CURDATE())");
-            $stmt->execute([$month]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $data[] = $row['total'] ?? 0;
+        // Get current Jalali year
+        $today = date('Y-m-d');
+        list($gy, $gm, $gd) = explode('-', $today);
+        $jalali = gregorian_to_jalali($gy, $gm, $gd);
+        $currentJalaliYear = $jalali[0];
+
+        // Fetch all sales
+        $stmt = $conn->prepare("SELECT sale_date, price FROM products");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $data = array_fill(0, 12, 0);
+        foreach ($rows as $row) {
+            list($gy, $gm, $gd) = explode('-', $row['sale_date']);
+            $jalali = gregorian_to_jalali($gy, $gm, $gd);
+            if ($jalali[0] == $currentJalaliYear) {
+                $monthIndex = (int)$jalali[1] - 1; // Jalali month 1-12, index 0-11
+                $data[$monthIndex] += $row['price'];
+            }
         }
         return $data;
     } catch (PDOException $e) {
@@ -92,6 +105,10 @@ $monthlySalesData = getMonthlySalesData($conn);
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css"/>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
+  <script src="js/persian-datepicker-init.js"></script>
 </head>
 <body class="dashboard-container">
   <aside class="sidebar">
@@ -109,48 +126,89 @@ $monthlySalesData = getMonthlySalesData($conn);
 
     <div class="content-area">
       <section class="kpi-grid">
-        <!-- فروش -->
+        <!-- پرداختی های امروز -->
         <div class="kpi-card">
-          <i class="fas fa-shopping-cart kpi-icon"></i>
-          <h3 class="body">فروش روزانه</h3>
-          <p class="kpi-value"><?php echo number_format($dailySales) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $dailySalesChange > 0 ? 'positive' : ($dailySalesChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($dailySalesChange > 0 ? '+' : '') . number_format($dailySalesChange, 1) . '%'; ?></p>
+          <div class="icon-container pastel-purple">
+            <i class="fas fa-calendar-day kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">پرداختی‌های امروز</h3>
+            <p class="kpi-value"><?php echo number_format($dailyPayments) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $dailyPaymentsChange > 0 ? 'positive' : ($dailyPaymentsChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($dailyPaymentsChange), 1) . '%'; ?> نسبت به دیروز
+              <span class="arrow"><?php echo $dailyPaymentsChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
         </div>
 
         <div class="kpi-card">
-          <i class="fas fa-shopping-cart kpi-icon"></i>
-          <h3 class="body">فروش ماهانه</h3>
-          <p class="kpi-value"><?php echo number_format($monthlySales) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $monthlySalesChange > 0 ? 'positive' : ($monthlySalesChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($monthlySalesChange > 0 ? '+' : '') . number_format($monthlySalesChange, 1) . '%'; ?></p>
+          <div class="icon-container pastel-green">
+            <i class="fas fa-calendar-alt kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">پرداختی‌های ماهانه</h3>
+            <p class="kpi-value"><?php echo number_format($monthlyPayments) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $monthlyPaymentsChange > 0 ? 'positive' : ($monthlyPaymentsChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($monthlyPaymentsChange), 1) . '%'; ?> نسبت به ماه قبل
+              <span class="arrow"><?php echo $monthlyPaymentsChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
         </div>
 
         <div class="kpi-card">
-          <i class="fas fa-shopping-cart kpi-icon"></i>
-          <h3 class="body">فروش سالانه</h3>
-          <p class="kpi-value"><?php echo number_format($yearlySales) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $yearlySalesChange > 0 ? 'positive' : ($yearlySalesChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($yearlySalesChange > 0 ? '+' : '') . number_format($yearlySalesChange, 1) . '%'; ?></p>
-        </div>
-
-        <!-- پرداختی‌ها -->
-        <div class="kpi-card">
-          <i class="fas fa-credit-card kpi-icon"></i>
-          <h3 class="body">پرداختی روزانه</h3>
-          <p class="kpi-value"><?php echo number_format($dailyPayments) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $dailyPaymentsChange > 0 ? 'positive' : ($dailyPaymentsChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($dailyPaymentsChange > 0 ? '+' : '') . number_format($dailyPaymentsChange, 1) . '%'; ?></p>
-        </div>
-
-        <div class="kpi-card">
-          <i class="fas fa-credit-card kpi-icon"></i>
-          <h3 class="body">پرداختی ماهانه</h3>
-          <p class="kpi-value"><?php echo number_format($monthlyPayments) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $monthlyPaymentsChange > 0 ? 'positive' : ($monthlyPaymentsChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($monthlyPaymentsChange > 0 ? '+' : '') . number_format($monthlyPaymentsChange, 1) . '%'; ?></p>
+          <div class="icon-container pastel-yellow">
+            <i class="fas fa-calendar-week kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">پرداختی‌های سالانه</h3>
+            <p class="kpi-value"><?php echo number_format($yearlyPayments) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $yearlyPaymentsChange > 0 ? 'positive' : ($yearlyPaymentsChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($yearlyPaymentsChange), 1) . '%'; ?> نسبت به سال قبل
+              <span class="arrow"><?php echo $yearlyPaymentsChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
         </div>
 
         <div class="kpi-card">
-          <i class="fas fa-credit-card kpi-icon"></i>
-          <h3 class="body">پرداختی سالانه</h3>
-          <p class="kpi-value"><?php echo number_format($yearlyPayments) . " تومان"; ?></p>
-          <p class="kpi-change <?php echo $yearlyPaymentsChange > 0 ? 'positive' : ($yearlyPaymentsChange < 0 ? 'negative' : 'zero'); ?>"><?php echo ($yearlyPaymentsChange > 0 ? '+' : '') . number_format($yearlyPaymentsChange, 1) . '%'; ?></p>
+          <div class="icon-container pastel-red">
+            <i class="fas fa-sun kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">فروش روزانه</h3>
+            <p class="kpi-value"><?php echo number_format($dailySales) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $dailySalesChange > 0 ? 'positive' : ($dailySalesChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($dailySalesChange), 1) . '%'; ?> نسبت به دیروز
+              <span class="arrow"><?php echo $dailySalesChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="icon-container pastel-blue">
+            <i class="fas fa-sun kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">فروش ماهانه</h3>
+            <p class="kpi-value"><?php echo number_format($monthlySales) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $monthlySalesChange > 0 ? 'positive' : ($monthlySalesChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($monthlySalesChange), 1) . '%'; ?> نسبت به ماه قبل
+              <span class="arrow"><?php echo $monthlySalesChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="icon-container pastel-orange">
+            <i class="fas fa-sun kpi-icon"></i>
+          </div>
+          <div class="kpi-text">
+            <h3 class="body">فروش سالانه (1404)</h3>
+            <p class="kpi-value"><?php echo number_format($yearlySales) ?: 0; ?></p>
+            <p class="kpi-change <?php echo $yearlySalesChange > 0 ? 'positive' : ($yearlySalesChange < 0 ? 'negative' : 'zero'); ?>">
+              <?php echo number_format(abs($yearlySalesChange), 1) . '%'; ?> نسبت به سال قبل
+              <span class="arrow"><?php echo $yearlySalesChange > 0 ? '&#9650;' : '&#9660;'; ?></span>
+            </p>
+          </div>
         </div>
       </section>
 
@@ -182,6 +240,7 @@ $monthlySalesData = getMonthlySalesData($conn);
       }
     });
   </script>
+  <script src="js/persian-datepicker-init.js"></script>
 
 </body>
 </html>

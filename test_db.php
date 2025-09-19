@@ -2,9 +2,9 @@
 require 'db.php';
 
 try {
-    $stmt = $conn->query("SELECT NOW() AS current_time");
+    $stmt = $conn->query("SELECT CURRENT_DATE AS current_date");
     $row = $stmt->fetch();
-    echo "Database connection successful. Current time: " . $row['current_time'];
+    echo "Database connection successful. Current date: " . $row['current_date'];
 } catch (PDOException $e) {
     echo "Database query failed: " . $e->getMessage();
 }
