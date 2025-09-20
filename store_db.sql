@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Sep 19, 2025 at 09:12 PM
+-- Generation Time: Sep 20, 2025 at 11:38 AM
 -- Server version: 8.2.0
 -- PHP Version: 8.2.13
 
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   `color` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `size` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sale_date` date NOT NULL,
-  `price` decimal(10,2) NOT NULL,
+  `price` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -67,9 +67,9 @@ CREATE TABLE IF NOT EXISTS `products` (
 --
 
 INSERT INTO `products` (`id`, `name`, `color`, `size`, `sale_date`, `price`, `created_at`) VALUES
-(17, 'تی‌شرت', 'سفید', 'S', '2025-09-19', 1450.00, '2025-09-19 18:59:53'),
-(18, 'تی‌شرت', 'سفید', 'S', '2025-09-19', 1450.00, '2025-09-19 19:10:44'),
-(19, 'باتری', 'سفید', '36', '2025-09-19', 99999999.99, '2025-09-19 20:03:47');
+(17, 'تی‌شرت', 'سفید', 'S', '2025-09-19', '1450.00', '2025-09-19 18:59:53'),
+(18, 'تی‌شرت', 'سفید', 'S', '2025-09-19', '1450.00', '2025-09-19 19:10:44'),
+(19, 'باتری', 'سفید', '36', '2025-09-19', '99999999.99', '2025-09-19 20:03:47');
 
 -- --------------------------------------------------------
 
@@ -90,7 +90,9 @@ CREATE TABLE IF NOT EXISTS `products-name` (
 
 INSERT INTO `products-name` (`id`, `name`, `price`) VALUES
 (0, 'باتری', '1900000'),
-(0, 'شراره', '1500');
+(0, 'شراره', '1500'),
+(0, '0ji', '5564'),
+(0, 'dgsgsd', '2000');
 
 -- --------------------------------------------------------
 
