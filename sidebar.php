@@ -28,6 +28,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a href="bulk_products.php" class="nav-link">
+          <i class="fas fa-layer-group nav-icon" aria-hidden="true"></i>
+          <span class="nav-text">ثبت عمده</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a href="payments.php" class="nav-link">
           <i class="fas fa-credit-card nav-icon" aria-hidden="true"></i>
           <span class="nav-text">پرداختی‌ها</span>
