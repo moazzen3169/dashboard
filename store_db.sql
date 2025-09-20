@@ -79,18 +79,19 @@ INSERT INTO `products` (`id`, `name`, `color`, `size`, `sale_date`, `price`, `cr
 
 DROP TABLE IF EXISTS `products-name`;
 CREATE TABLE IF NOT EXISTS `products-name` (
-  `id` int NOT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `price` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `price` decimal(10,2) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `products-name`
 --
 
-INSERT INTO `products-name` (`id`, `name`, `price`) VALUES
-(0, 'باتری', '1900000'),
-(0, 'شراره', '1500');
+INSERT INTO `products-name` (`name`, `price`) VALUES
+('باتری', '1900000.00'),
+('شراره', '1500.00');
 
 -- --------------------------------------------------------
 

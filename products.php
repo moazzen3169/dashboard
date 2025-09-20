@@ -202,12 +202,12 @@ foreach ($products as &$p) {
           <label>نام محصول:</label>
       <select name="name" id="product_name_select" required>
         <?php
-          // Fetch product names from products_name table
-          $stmt = $conn->prepare("SELECT name FROM `products-name` ORDER BY id DESC");
+          // Fetch product names and prices from products-name table
+          $stmt = $conn->prepare("SELECT name, price FROM `products-name` ORDER BY id DESC");
           $stmt->execute();
-          $productNames = $stmt->fetchAll(PDO::FETCH_COLUMN);
-          foreach ($productNames as $productName) {
-            echo '<option value="' . htmlspecialchars($productName) . '">' . htmlspecialchars($productName) . '</option>';
+          $productNameItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+          foreach ($productNameItems as $item) {
+            echo '<option value="' . htmlspecialchars($item['name']) . '" data-price="' . htmlspecialchars($item['price']) . '">' . htmlspecialchars($item['name']) . '</option>';
           }
         ?>
       </select>
@@ -352,17 +352,6 @@ foreach ($products as &$p) {
   </div>
 
   <script>
-    // باز کردن مودال ویرایش
-    function openEditModal(product) {
-      document.getElementById('edit_id').value = product.id;
-      document.getElementById('edit_name').value = product.name;
-      document.getElementById('edit_color').value = product.color;
-      document.getElementById('edit_size').value = product.size;
-      document.getElementById('edit_date').value = product.sale_date_jalali;
-      document.getElementById('edit_price').value = product.price;
-      document.getElementById('editModal').classList.add('active');
-    }
-
     // باز کردن مودال حذف
     function openDeleteModal(id) {
       document.getElementById('delete_id').value = id;
@@ -438,5 +427,31 @@ foreach ($products as &$p) {
     </div>
   </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productNameSelect = document.getElementById('product_name_select');
+    const mainPriceInput = document.querySelector('.form input[name="price"]');
+    const formatNumber = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    function updatePrice() {
+        if (productNameSelect.selectedOptions.length > 0) {
+            const selectedOption = productNameSelect.selectedOptions[0];
+            const price = selectedOption.dataset.price;
+            if (price && mainPriceInput) {
+                // The 'input' event listener for formatting is already on the page.
+                // We can just set the value and dispatch the event.
+                mainPriceInput.value = parseFloat(price).toFixed(0); // Set raw number
+                mainPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    }
+
+    // Update price on change
+    productNameSelect.addEventListener('change', updatePrice);
+
+    // Update price on initial load
+    updatePrice();
+});
+</script>
 </body>
 </html>

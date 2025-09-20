@@ -45,15 +45,23 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          // Add new option to select and select it
+          // Add new option to select, add data-price, and select it
           const option = document.createElement('option');
           option.value = newName;
           option.textContent = newName;
+          option.dataset.price = newPrice; // Add data-price attribute
           productNameSelect.appendChild(option);
           productNameSelect.value = newName;
+
+          // Update the main form's price input and trigger formatting
+          const mainPriceInput = document.querySelector('.form input[name="price"]');
+          if (mainPriceInput) {
+            mainPriceInput.value = newPrice;
+            mainPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+
           hideModal();
-          // Clear form inputs
-          addProductNameForm.reset();
+          addProductNameForm.reset(); // Clear form inputs
         } else {
           alert('خطا در افزودن نام محصول: ' + (data.message || 'خطای نامشخص'));
         }
