@@ -1,0 +1,346 @@
+/* Modern Styling for Factor Products Page */
+
+/* Import Design System */
+@import url('design-system.css');
+
+/* Page Specific Variables */
+:root {
+  --factor-bg: #f8fafc;
+  --factor-card-bg: #ffffff;
+  --factor-border: #e2e8f0;
+  --factor-text: #334155;
+  --factor-text-muted: #64748b;
+  --factor-success: #10b981;
+  --factor-danger: #ef4444;
+  --factor-primary: #3b82f6;
+  --factor-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --factor-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Main Content Layout - Fixed positioning for sidebar */
+.factor-main-content {
+  flex: 1;
+  padding: var(--space-xl);
+  background: var(--factor-bg);
+  min-height: 100vh;
+  margin-right: 280px; /* Account for fixed sidebar */
+  position: relative;
+  z-index: 10; /* Ensure content appears above sidebar */
+}
+
+/* Header Section */
+.factor-header {
+  background: var(--factor-card-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--factor-shadow);
+  border: 1px solid var(--factor-border);
+}
+
+.factor-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0 0 var(--space-md) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.factor-title i {
+  color: var(--factor-primary);
+}
+
+/* Form Section */
+.factor-form-section {
+  background: var(--factor-card-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--factor-shadow);
+  border: 1px solid var(--factor-border);
+}
+
+.factor-form-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0 0 var(--space-lg) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.factor-form-title i {
+  color: var(--factor-success);
+}
+
+.factor-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.factor-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.factor-form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--factor-text);
+  margin-bottom: var(--space-xs);
+}
+
+.factor-form-input,
+.factor-form-select {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--factor-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--factor-text);
+  font-size: var(--font-size-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.factor-form-input:focus,
+.factor-form-select:focus {
+  outline: none;
+  border-color: var(--factor-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.factor-form-input:invalid {
+  border-color: var(--factor-danger);
+}
+
+.factor-products-container {
+  background: var(--factor-card-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--factor-border);
+}
+
+.factor-add-product-btn {
+  background: var(--factor-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: var(--space-sm);
+}
+
+.factor-add-product-btn:hover {
+  background: #2563eb;
+}
+
+.factor-submit-btn {
+  background: var(--factor-success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-md) var(--space-xl);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.factor-submit-btn:hover {
+  background: #059669;
+}
+
+/* Tables */
+.factor-table-section {
+  background: var(--factor-card-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--factor-shadow);
+  border: 1px solid var(--factor-border);
+}
+
+.factor-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0 0 var(--space-lg) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.factor-section-title i {
+  color: var(--factor-primary);
+}
+
+.factor-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--factor-shadow);
+}
+
+.factor-table th,
+.factor-table td {
+  border: 1px solid var(--factor-border);
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--factor-text);
+}
+
+.factor-table th {
+  background: var(--color-surface-subtle);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.factor-table tr:nth-child(even) {
+  background: var(--color-surface-subtle);
+}
+
+.factor-table tr:hover {
+  background: var(--factor-bg);
+}
+
+.factor-table .btn {
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  margin: 0 var(--space-xs);
+}
+
+.factor-btn-primary {
+  background: var(--factor-primary);
+  color: white;
+}
+
+.factor-btn-primary:hover {
+  background: #2563eb;
+}
+
+.factor-btn-danger {
+  background: var(--factor-danger);
+  color: white;
+}
+
+.factor-btn-danger:hover {
+  background: #dc2626;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .factor-main-content {
+    padding: var(--space-md);
+    margin-right: 0; /* Remove margin on mobile */
+    margin-top: 60px; /* Account for mobile sidebar */
+  }
+
+  .factor-form-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .factor-table {
+    font-size: var(--font-size-xs);
+  }
+
+  .factor-table th,
+  .factor-table td {
+    padding: var(--space-sm);
+  }
+
+  .factor-header,
+  .factor-form-section,
+  .factor-table-section {
+    padding: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .factor-title,
+  .factor-form-title,
+  .factor-section-title {
+    font-size: var(--font-size-md);
+  }
+
+  .factor-table {
+    font-size: 10px;
+  }
+
+  .factor-table th,
+  .factor-table td {
+    padding: var(--space-xs);
+  }
+}
+
+/* Animation */
+.factor-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading States */
+.factor-loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--factor-border);
+  border-radius: 50%;
+  border-top-color: var(--factor-primary);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Print Styles */
+@media print {
+  .factor-main-content {
+    padding: 0;
+    margin-right: 0;
+  }
+
+  .factor-header,
+  .factor-form-section,
+  .factor-table-section {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+
+  .factor-add-product-btn,
+  .factor-submit-btn {
+    display: none;
+  }
+}
