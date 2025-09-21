@@ -2,6 +2,10 @@
 include 'db.php';
 include 'jalali_calendar.php'; // فایل تاریخ خودت
 
+// گرفتن تاریخ جلالی امروز
+list($jy, $jm, $jd) = gregorian_to_jalali(date('Y'), date('m'), date('d'));
+$current_jalali_date = sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+
 // =======================
 // ذخیره خریدها
 // =======================
@@ -260,32 +264,50 @@ $purchases = $conn->query("
             const productDiv = document.createElement('div');
             productDiv.className = 'factor-products-container';
             productDiv.style.marginBottom = 'var(--space-md)';
-            productDiv.innerHTML = `
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-md); align-items: end;">
-                    <div>
-                        <label class="factor-form-label">نام محصول:</label>
-                        <input type="text" name="products[${idx}][product_name]" class="factor-form-input" required placeholder="نام محصول را وارد کنید">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">قیمت فی:</label>
-                        <input type="number" step="0.01" name="products[${idx}][unit_price]" class="factor-form-input" required placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">تعداد:</label>
-                        <input type="number" min="1" name="products[${idx}][quantity]" class="factor-form-input" required placeholder="1">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">تاریخ:</label>
-                        <input type="text" name="products[${idx}][purchase_date]" class="factor-form-input" required placeholder="1404/06/10">
-                    </div>
-                </div>
-                <button type="button" class="btn factor-btn-danger" onclick="removeProductRow(this)" style="margin-top: var(--space-sm);">
-                    <i class="fas fa-minus"></i>
-                    حذف محصول
-                </button>
-            `;
+            productDiv.innerHTML = '<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-md); align-items: end;">' +
+                '<div>' +
+                    '<label class="factor-form-label">نام محصول:</label>' +
+                    '<input type="text" name="products[' + idx + '][product_name]" class="factor-form-input" required placeholder="نام محصول را وارد کنید">' +
+                '</div>' +
+                '<div>' +
+                    '<label class="factor-form-label">قیمت فی:</label>' +
+                    '<input type="text" name="products[' + idx + '][unit_price]" class="factor-form-input price-input" required placeholder="0.00">' +
+                '</div>' +
+                '<div>' +
+                    '<label class="factor-form-label">تعداد:</label>' +
+                    '<input type="number" min="1" name="products[' + idx + '][quantity]" class="factor-form-input" required placeholder="1">' +
+                '</div>' +
+                '<div>' +
+                    '<label class="factor-form-label">تاریخ:</label>' +
+                    '<input type="text" name="products[' + idx + '][purchase_date]" class="factor-form-input" required placeholder="1404/06/10" value="' + current_jalali_date + '">' +
+                '</div>' +
+            '</div>' +
+            '<button type="button" class="btn factor-btn-danger" onclick="removeProductRow(this)" style="margin-top: var(--space-sm);">' +
+                '<i class="fas fa-minus"></i>' +
+                'حذف محصول' +
+            '</button>';
 
             container.appendChild(productDiv);
+
+            // Focus on the first input of the new product
+            const firstInput = productDiv.querySelector('input[type="text"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+
+            // Add event listener for price input formatting
+            const priceInput = productDiv.querySelector('.price-input');
+            priceInput.addEventListener('input', function(e) {
+                let value = e.target.value;
+                // Remove all non-digit characters except dot
+                value = value.replace(/[^0-9.]/g, '');
+                // Split integer and decimal parts
+                const parts = value.split('.');
+                // Format integer part with commas
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                // Join parts back
+                e.target.value = parts.join('.');
+            });
         }
 
         function removeProductRow(button) {
@@ -293,8 +315,14 @@ $purchases = $conn->query("
             productDiv.remove();
         }
 
-        // Form validation
+        // Form validation and comma removal on submit
         document.getElementById('purchaseForm').addEventListener('submit', function(e) {
+            // Remove commas from all price inputs before submit
+            const priceInputs = document.querySelectorAll('.price-input');
+            priceInputs.forEach(input => {
+                input.value = input.value.replace(/,/g, '');
+            });
+
             const buyerSelect = document.getElementById('buyer_select');
             const buyerName = document.getElementById('buyer_name');
 
@@ -321,46 +349,8 @@ $purchases = $conn->query("
         });
 
         // Auto-focus first input when adding new product
-        function addProductRow() {
-            const container = document.getElementById('products');
-            const idx = rowIndex++;
-
-            const productDiv = document.createElement('div');
-            productDiv.className = 'factor-products-container';
-            productDiv.style.marginBottom = 'var(--space-md)';
-            productDiv.innerHTML = `
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-md); align-items: end;">
-                    <div>
-                        <label class="factor-form-label">نام محصول:</label>
-                        <input type="text" name="products[${idx}][product_name]" class="factor-form-input" required placeholder="نام محصول را وارد کنید">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">قیمت فی:</label>
-                        <input type="number" step="0.01" name="products[${idx}][unit_price]" class="factor-form-input" required placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">تعداد:</label>
-                        <input type="number" min="1" name="products[${idx}][quantity]" class="factor-form-input" required placeholder="1">
-                    </div>
-                    <div>
-                        <label class="factor-form-label">تاریخ:</label>
-                        <input type="text" name="products[${idx}][purchase_date]" class="factor-form-input" required placeholder="1404/06/10">
-                    </div>
-                </div>
-                <button type="button" class="btn factor-btn-danger" onclick="removeProductRow(this)" style="margin-top: var(--space-sm);">
-                    <i class="fas fa-minus"></i>
-                    حذف محصول
-                </button>
-            `;
-
-            container.appendChild(productDiv);
-
-            // Focus on the first input of the new product
-            const firstInput = productDiv.querySelector('input[type="text"]');
-            if (firstInput) {
-                firstInput.focus();
-            }
-        }
+        // تاریخ جلالی امروز از PHP به JS
+        const current_jalali_date = "<?php echo $current_jalali_date; ?>";
     </script>
 </body>
 </html>
