@@ -16,35 +16,26 @@
   <nav class="sidebar-nav">
     <ul class="nav-list">
       <li class="nav-item">
-        <a href="dashboard.php" class="nav-link">
+        <a href="factor-products.php" class="nav-link">
           <i class="fas fa-tachometer-alt nav-icon" aria-hidden="true"></i>
-          <span class="nav-text">داشبورد</span>
+          <span class="nav-text">صفحه اصلی</span>
         </a>
       </li>
-      <li class="nav-item">
-        <a href="products.php" class="nav-link">
-          <i class="fas fa-box nav-icon" aria-hidden="true"></i>
-          <span class="nav-text">محصولات</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a href="bulk_products.php" class="nav-link">
-          <i class="fas fa-layer-group nav-icon" aria-hidden="true"></i>
-          <span class="nav-text">ثبت عمده</span>
-        </a>
-      </li>
+
       <li class="nav-item">
         <a href="payments.php" class="nav-link">
           <i class="fas fa-credit-card nav-icon" aria-hidden="true"></i>
           <span class="nav-text">پرداختی‌ها</span>
         </a>
       </li>
+
       <li class="nav-item">
-        <a href="invoices.php" class="nav-link">
-          <i class="fas fa-file-invoice nav-icon" aria-hidden="true"></i>
-          <span class="nav-text">فاکتورها</span>
+        <a href="reports.php" class="nav-link">
+          <i class="fas fa-chart-bar nav-icon" aria-hidden="true"></i>
+          <span class="nav-text">گزارش‌ها</span>
         </a>
       </li>
+
     </ul>
   </nav>
 

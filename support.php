@@ -48,7 +48,7 @@
     <div class="title">
         کــاربر مورد نظـــر یافـــــــت نشـــــــــد لطفابعدا با هـادی تماس بگیـــــرید!!
     </div>
-    <a  href="dashboard.php" class="back_btn">بازگشت به داشبورد</a>
+    <a  href="factor-products.php" class="back_btn">بازگشت به داشبورد</a>
     
 </body>
 </html>
