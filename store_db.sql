@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Sep 21, 2025 at 09:46 AM
+-- Generation Time: Sep 22, 2025 at 01:40 PM
 -- Server version: 8.2.0
 -- PHP Version: 8.2.13
 
@@ -30,18 +30,36 @@ SET time_zone = "+00:00";
 DROP TABLE IF EXISTS `buyers`;
 CREATE TABLE IF NOT EXISTS `buyers` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `buyers`
 --
 
 INSERT INTO `buyers` (`id`, `name`) VALUES
-(1, 'هادی'),
-(2, 'مهیار'),
-(3, 'احمد');
+(1, 'hadi'),
+(2, 'احمد');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `invoices`
+--
+
+DROP TABLE IF EXISTS `invoices`;
+CREATE TABLE IF NOT EXISTS `invoices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `buyer_id` int NOT NULL,
+  `invoice_month` char(7) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'فرمت: YYYY-MM',
+  `invoice_date` date NOT NULL,
+  `total_purchases` decimal(15,2) NOT NULL,
+  `total_payments` decimal(15,2) NOT NULL,
+  `balance` decimal(15,2) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `buyer_id` (`buyer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -52,19 +70,20 @@ INSERT INTO `buyers` (`id`, `name`) VALUES
 DROP TABLE IF EXISTS `payments`;
 CREATE TABLE IF NOT EXISTS `payments` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `target` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `amount` decimal(10,2) NOT NULL,
+  `buyer_id` int NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
   `payment_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`id`),
+  KEY `buyer_id` (`buyer_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `payments`
 --
 
-INSERT INTO `payments` (`id`, `target`, `amount`, `payment_date`, `created_at`) VALUES
-(10, 'هادی', 5555.00, '2025-09-19', '2025-09-19 19:10:19');
+INSERT INTO `payments` (`id`, `buyer_id`, `amount`, `payment_date`, `created_at`) VALUES
+(1, 1, 10000.00, '2025-09-22', '2025-09-22 12:40:08');
 
 -- --------------------------------------------------------
 
@@ -75,8 +94,8 @@ INSERT INTO `payments` (`id`, `target`, `amount`, `payment_date`, `created_at`) 
 DROP TABLE IF EXISTS `products-name`;
 CREATE TABLE IF NOT EXISTS `products-name` (
   `id` int NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `price` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL
+  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -99,26 +118,25 @@ DROP TABLE IF EXISTS `purchases`;
 CREATE TABLE IF NOT EXISTS `purchases` (
   `id` int NOT NULL AUTO_INCREMENT,
   `buyer_id` int NOT NULL,
-  `product_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `unit_price` decimal(15,2) NOT NULL,
   `quantity` int NOT NULL,
   `total_price` decimal(15,2) GENERATED ALWAYS AS ((`unit_price` * `quantity`)) STORED,
   `purchase_date` date NOT NULL,
   PRIMARY KEY (`id`),
   KEY `buyer_id` (`buyer_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `purchases`
 --
 
 INSERT INTO `purchases` (`id`, `buyer_id`, `product_name`, `unit_price`, `quantity`, `purchase_date`) VALUES
-(5, 1, 'سرهم', 800.00, 10, '2025-09-01'),
-(3, 2, 'سرهم', 1500.00, 4, '2025-09-01'),
-(4, 2, 'باتری', 2000.00, 10, '2025-09-01'),
-(6, 1, 'باتری', 10000.00, 15000, '2025-09-01'),
-(7, 1, 'سرهم', 100000.00, 10, '2025-08-01'),
-(9, 3, 'باتری', 1600.00, 6, '2025-09-01');
+(1, 1, 'سرهم', 50000.00, 2, '2025-09-22'),
+(2, 1, 'باتری', 1600000.00, 5, '2025-09-22'),
+(3, 2, 'بارتی', 500.00, 6, '2025-09-22'),
+(4, 2, 'جججج', 51515.00, 5, '2025-09-22'),
+(5, 1, 'سرهم', 5000.00, 1, '2025-08-22');
 
 -- --------------------------------------------------------
 
@@ -136,6 +154,28 @@ CREATE TABLE IF NOT EXISTS `sales` (
   PRIMARY KEY (`id`),
   KEY `product_id` (`product_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `invoices`
+--
+ALTER TABLE `invoices`
+  ADD CONSTRAINT `fk_invoices_buyer` FOREIGN KEY (`buyer_id`) REFERENCES `buyers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `payments`
+--
+ALTER TABLE `payments`
+  ADD CONSTRAINT `fk_payments_buyer` FOREIGN KEY (`buyer_id`) REFERENCES `buyers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `purchases`
+--
+ALTER TABLE `purchases`
+  ADD CONSTRAINT `fk_purchases_buyer` FOREIGN KEY (`buyer_id`) REFERENCES `buyers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
