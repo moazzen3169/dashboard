@@ -2,6 +2,11 @@
 include 'db.php';
 include 'jalali_calendar.php';
 
+/** number_format امن (NULL -> 0) */
+function nf($v) {
+    return number_format((float)($v ?? 0));
+}
+
 $buyer_id = intval($_GET['buyer_id'] ?? 0);
 if ($buyer_id <= 0) {
     die("خریدار نامعتبر است");
@@ -23,19 +28,31 @@ $purchases = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // گروه‌بندی بر اساس ماه جلالی
 $grouped = [];
 foreach ($purchases as $p) {
+    // سازگاری با ردیف‌های قدیمی که is_return ندارند
+    $isReturn = !empty($p['is_return']) && intval($p['is_return']) === 1;
+
     list($gy,$gm,$gd) = explode('-', $p['purchase_date']);
     list($jy,$jm,$jd) = gregorian_to_jalali($gy, $gm, $gd);
-    $monthKey = sprintf("%04d/%02d", $jy, $jm); // مثل 1404/06
+    $monthKey = sprintf("%04d/%02d", $jy, $jm);
+
     if (!isset($grouped[$monthKey])) {
         $grouped[$monthKey] = [
-            'products' => [],
-            'total_price' => 0,
-            'total_qty' => 0
+            'products'    => [],
+            'total_price' => 0.0,
+            'total_qty'   => 0
         ];
     }
+
     $grouped[$monthKey]['products'][] = $p;
-    $grouped[$monthKey]['total_price'] += $p['total_price'];
-    $grouped[$monthKey]['total_qty']   += $p['quantity'];
+
+    // خرید عادی + ، مرجوعی -
+    if ($isReturn) {
+        $grouped[$monthKey]['total_price'] -= (float)$p['total_price'];
+        $grouped[$monthKey]['total_qty']   -= (int)$p['quantity'];
+    } else {
+        $grouped[$monthKey]['total_price'] += (float)$p['total_price'];
+        $grouped[$monthKey]['total_qty']   += (int)$p['quantity'];
+    }
 }
 
 // آماده‌سازی داده‌های ماهانه
@@ -52,22 +69,22 @@ foreach ($grouped as $month => $data) {
     // پرداختی‌های همان ماه
     $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date BETWEEN ? AND ?");
     $stmt->execute([$buyer_id, $startDate, $endDate]);
-    $monthPayments = $stmt->fetchColumn() ?? 0;
+    $monthPayments = (float)($stmt->fetchColumn() ?: 0);
 
-    // مانده حساب تا پایان این ماه
-    $stmt = $conn->prepare("SELECT SUM(total_price) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
+    // مانده حساب تا پایان این ماه (با احتساب مرجوعی)
+    $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endDate]);
-    $totalPurchases = $stmt->fetchColumn() ?? 0;
+    $totalPurchases = (float)($stmt->fetchColumn() ?: 0);
 
     $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date <= ?");
     $stmt->execute([$buyer_id, $endDate]);
-    $totalPayments = $stmt->fetchColumn() ?? 0;
+    $totalPaymentsTillEnd = (float)($stmt->fetchColumn() ?: 0);
 
-    $balance = $totalPurchases - $totalPayments;
+    $balance = $totalPurchases - $totalPaymentsTillEnd;
 
     $monthlyData[$month] = [
-        'total_qty'     => $data['total_qty'],
-        'total_price'   => $data['total_price'],
+        'total_qty'     => (int)$data['total_qty'],
+        'total_price'   => (float)$data['total_price'],
         'monthPayments' => $monthPayments,
         'balance'       => $balance,
         'products'      => $data['products']
@@ -76,10 +93,10 @@ foreach ($grouped as $month => $data) {
 
 $selectedMonth = $_GET['month'] ?? null;
 
-// متغیرهای خلاصه ماه
-$previousBalance = 0;
-$totalPayments = 0;
-$balance = 0;
+// متغیرهای خلاصه ماه – مقداردهی امن
+$previousBalance = 0.0;
+$totalPayments   = 0.0;
+$balance         = 0.0;
 
 if ($selectedMonth) {
     list($jy, $jm) = explode('/', $selectedMonth);
@@ -87,8 +104,8 @@ if ($selectedMonth) {
     $endOfMonthGregorian = jalali_to_gregorian($jy, $jm, 31);
     $endOfMonthDate = sprintf("%04d-%02d-%02d", $endOfMonthGregorian[0], $endOfMonthGregorian[1], $endOfMonthGregorian[2]);
 
-    $prevMonth = $jm - 1;
-    $prevYear  = $jy;
+    $prevMonth = (int)$jm - 1;
+    $prevYear  = (int)$jy;
     if ($prevMonth <= 0) {
         $prevMonth = 12;
         $prevYear--;
@@ -96,249 +113,197 @@ if ($selectedMonth) {
     $endOfPrevMonthGregorian = jalali_to_gregorian($prevYear, $prevMonth, 31);
     $endOfPrevMonthDate = sprintf("%04d-%02d-%02d", $endOfPrevMonthGregorian[0], $endOfPrevMonthGregorian[1], $endOfPrevMonthGregorian[2]);
 
-    // حساب قبلی (بدون این ماه)
-    $stmt = $conn->prepare("SELECT SUM(total_price) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
+    // حساب قبلی (تا پایان ماه قبل) با احتساب مرجوعی
+    $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endOfPrevMonthDate]);
-    $purchasesPrev = $stmt->fetchColumn() ?? 0;
+    $purchasesPrev = (float)($stmt->fetchColumn() ?: 0);
 
     $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date <= ?");
     $stmt->execute([$buyer_id, $endOfPrevMonthDate]);
-    $paymentsPrev = $stmt->fetchColumn() ?? 0;
+    $paymentsPrev = (float)($stmt->fetchColumn() ?: 0);
 
     $previousBalance = $purchasesPrev - $paymentsPrev;
 
-    // خرید و پرداخت تا همین ماه
-    $stmt = $conn->prepare("SELECT SUM(total_price) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
+    // خرید و پرداخت تا پایان ماه انتخاب‌شده
+    $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endOfMonthDate]);
-    $totalPurchases = $stmt->fetchColumn() ?? 0;
+    $totalPurchases = (float)($stmt->fetchColumn() ?: 0);
 
     $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date <= ?");
     $stmt->execute([$buyer_id, $endOfMonthDate]);
-    $totalPayments = $stmt->fetchColumn() ?? 0;
+    $totalPayments = (float)($stmt->fetchColumn() ?: 0);
 
     $balance = $totalPurchases - $totalPayments;
+
+    // اطمینان از وجود کلید برای ماه انتخاب‌شده حتی اگر خریدی نبوده
+    if (!isset($monthlyData[$selectedMonth])) {
+        $monthlyData[$selectedMonth] = [
+            'total_qty'     => 0,
+            'total_price'   => 0.0,
+            'monthPayments' => 0.0,
+            'balance'       => $balance,
+            'products'      => []
+        ];
+    }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
+<meta charset="UTF-8">
+<title>جزئیات خرید - <?= htmlspecialchars($buyer['name']) ?></title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="css/sidebar.css">
+<link rel="stylesheet" href="css/design-system.css">
+<link rel="stylesheet" href="css/details.css">
 <style>
-/* استایل مخصوص پرینت */
+/* فقط فاکتور چاپ شود */
 @media print {
-  body * {
-    visibility: hidden; /* همه المان‌ها مخفی میشن */
-  }
-  #invoice-area, #invoice-area * {
-    visibility: visible; /* فقط فاکتور و محتوایش نمایش داده میشه */
-    
-  }
-  #invoice-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
+  body * { visibility: hidden !important; }
+  #invoice-area, #invoice-area * { visibility: visible !important; }
+  #invoice-area { position:absolute; inset:0; width:100%; }
 }
-
-
-#invoice-area {
-    max-width:800px;
-    margin:0 auto;
-    padding:20px;
-    background-color:#fff;
-    box-shadow:var(--factor-shadow-lg);
-    border-radius:10px;
-}
-
-
-
 </style>
-
-
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>جزئیات خرید - <?= htmlspecialchars($buyer['name']) ?></title>
-    <link rel="stylesheet" href="fonts/fonts.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/sidebar.css">
-    <link rel="stylesheet" href="css/design-system.css">
-    <link rel="stylesheet" href="css/details.css">
 </head>
-
 <body class="dashboard-container">
-    <div class="details-main-content">
-        <div class="details-header details-fade-in">
-            <h1 class="details-title"><i class="fas fa-user-circle"></i> جزئیات خریدهای خریدار</h1>
-            <div class="details-buyer-info">
-                <h2 class="details-buyer-name"><?= htmlspecialchars($buyer['name']) ?></h2>
-                <p class="body" style="color: var(--details-text-muted); margin-top: var(--space-xs);">مشاهده جزئیات و تاریخچه خریدها</p>
-            </div>
-        </div>
+<div class="details-main-content">
 
-        <?php if (!$selectedMonth): ?>
-            <!-- جدول خریدها بر اساس ماه -->
-            <div class="details-monthly-section details-fade-in">
-                <h2 class="details-section-title"><i class="fas fa-calendar-month"></i> خریدها بر اساس ماه</h2>
-                <div class="table-responsive">
-                    <table class="details-monthly-table">
-                        <thead>
-                            <tr>
-                                <th>ماه</th>
-                                <th>تعداد محصولات</th>
-                                <th>مجموع مبلغ خرید</th>
-                                <th>پرداختی همان ماه</th>
-                                <th>مانده حساب نهایی</th>
-                                <th>عملیات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($monthlyData as $month => $info): ?>
-                            <tr>
-                                <td><strong><?= $month ?></strong></td>
-                                <td><?= number_format($info['total_qty']) ?></td>
-                                <td><?= number_format($info['total_price']) ?> تومان</td>
-                                <td><?= number_format($info['monthPayments']) ?> تومان</td>
-                                <td style="font-weight:bold; color:red;"><?= number_format($info['balance']) ?> تومان</td>
-                                <td>
-                                    <a href="details.php?buyer_id=<?= $buyer_id ?>&month=<?= $month ?>" class="details-view-btn">
-                                        <i class="fas fa-eye"></i> نمایش جزئیات
-                                    </a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<?php if (!$selectedMonth): ?>
+  <!-- لیست ماه‌ها -->
+  <div class="details-monthly-section details-fade-in">
+    <h2 class="details-section-title"><i class="fas fa-calendar-month"></i> خریدها بر اساس ماه</h2>
+    <div class="table-responsive">
+      <table class="details-monthly-table">
+        <thead>
+          <tr>
+            <th>ماه</th>
+            <th>تعداد محصولات</th>
+            <th>مجموع مبلغ</th>
+            <th>پرداختی همان ماه</th>
+            <th>مانده حساب نهایی</th>
+            <th>عملیات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach($monthlyData as $month=>$info): ?>
+          <tr>
+            <td><strong><?= htmlspecialchars($month) ?></strong></td>
+            <td><?= nf($info['total_qty']) ?></td>
+            <td><?= nf($info['total_price']) ?> تومان</td>
+            <td><?= nf($info['monthPayments']) ?> تومان</td>
+            <td style="font-weight:bold; color:red;"><?= nf($info['balance']) ?> تومان</td>
+            <td>
+              <a href="details.php?buyer_id=<?= $buyer_id ?>&month=<?= urlencode($month) ?>" class="details-view-btn">
+                <i class="fas fa-eye"></i> نمایش جزئیات
+              </a>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-            <?php else: ?>
-    <?php
-    // تاریخ صدور فاکتور (شمسی)
-    $now = date("Y-m-d H:i:s");
-    list($gy,$gm,$gd) = explode('-', date("Y-m-d"));
-    list($jy,$jm,$jd) = gregorian_to_jalali($gy, $gm, $gd);
-    $jalaliDate = sprintf("%04d/%02d/%02d", $jy, $jm, $jd);
+<?php else: ?>
+  <?php
+  // تاریخ صدور فاکتور (شمسی)
+  list($gy,$gm,$gd) = explode('-', date("Y-m-d"));
+  list($jy,$jm,$jd) = gregorian_to_jalali($gy, $gm, $gd);
+  $jalaliDate = sprintf("%04d/%02d/%02d", $jy, $jm, $jd);
+  $invoiceNumber = $buyer_id . str_replace("/", "", $selectedMonth);
+  ?>
 
-    // شماره فاکتور (ساده: id خریدار + ماه انتخابی)
-    $invoiceNumber = $buyer_id . str_replace("/", "", $selectedMonth);
-    ?>
+  <div id="invoice-area" class="details-fade-in">
+    <h2 class="details-section-title" style="text-align:center;">🧾 فاکتور ماه <?= htmlspecialchars($selectedMonth) ?></h2>
 
-    <div id="invoice-area">
-        <h2 style="text-align:center; margin:20px 0;">فاکتور خرید</h2>
+    <!-- سربرگ فاکتور -->
+    <table class="details-products-table" style="margin-bottom:var(--space-md);">
+      <tr style="background:#f7f7f7;">
+        <td><strong>ماه:</strong> <?= htmlspecialchars($selectedMonth) ?></td>
+        <td><strong>شماره فاکتور:</strong> <?= htmlspecialchars($invoiceNumber) ?></td>
+      </tr>
+      <tr>
+        <td><strong>فروشنده:</strong> تولیدی الماس</td>
+        <td><strong>تاریخ صدور:</strong> <?= $jalaliDate ?></td>
+      </tr>
+      <tr>
+        <td colspan="2"><strong>خریدار:</strong> <?= htmlspecialchars($buyer['name']) ?></td>
+      </tr>
+    </table>
 
-        <!-- سربرگ فاکتور -->
-        <table border="1" cellspacing="0" cellpadding="10" width="100%" style="border-collapse:collapse; font-size:14px;">
-            <tr style="background:#f0f0f0;">
-                <td><strong>فاتور ماه :</strong> <?= $selectedMonth ?></td>
-                <td><strong>شماره فاکتور:</strong> <?= $invoiceNumber ?></td>
-            </tr>
-            <tr>
-                <td><strong>فروشنده:</strong> تولیدی الماس</td>
-                <td><strong>تاریخ صدور:</strong> <?= $jalaliDate ?></td>
-            </tr>
-            <tr>
-                <td colspan="2"><strong>خریدار:</strong> <?= htmlspecialchars($buyer['name']) ?></td>
-            </tr>
-        </table>
+    <!-- جدول محصولات -->
+    <div class="table-responsive">
+      <table class="details-products-table">
+        <thead>
+          <tr>
+            <th>ردیف</th>
+            <th>نام محصول</th>
+            <th>قیمت فی</th>
+            <th>تعداد</th>
+            <th>جمع</th>
+            <th>نوع</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php
+          $i=1;
+          $totalQty = 0;            // خرید عادی
+          $totalPrice = 0.0;        // خرید عادی
+          $totalReturnsQty = 0;     // مرجوعی
+          $totalReturnsPrice = 0.0; // مرجوعی
 
-        <br>
-
-        <!-- جدول محصولات -->
-        <table border="1" cellspacing="0" cellpadding="8" width="100%" style="border-collapse:collapse; text-align:center; font-size:14px;">
-            <thead style="background:#e8e8e8;">
-                <tr>
-                    <th>ردیف</th>
-                    <th>نام محصول</th>
-                    <th>قیمت فی</th>
-                    <th>تعداد</th>
-                    <th>جمع</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $i = 1;
-                $totalQty = 0;
-                $totalPrice = 0;
-                foreach($monthlyData[$selectedMonth]['products'] as $p):
-                    $totalQty += $p['quantity'];
-                    $totalPrice += $p['total_price'];
-                ?>
-                <tr>
-                    <td><?= $i++ ?></td>
-                    <td><?= htmlspecialchars($p['product_name']) ?></td>
-                    <td><?= number_format($p['unit_price']) ?> تومان</td>
-                    <td><?= number_format($p['quantity']) ?></td>
-                    <td><?= number_format($p['total_price']) ?> تومان</td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-
-        <br>
-
-        <!-- جمع‌بندی -->
-        <h3 style="margin:15px 0;">خلاصه حساب</h3>
-        <table border="1" cellspacing="0" cellpadding="8" width="100%" style="border-collapse:collapse; font-size:14px;">
-            <tr>
-                <td><strong>تعداد کل محصولات</strong></td>
-                <td><?= number_format($totalQty) ?></td>
-            </tr>
-            <tr>
-                <td><strong>مجموع مبلغ ماه</strong></td>
-                <td><?= number_format($totalPrice) ?> تومان</td>
-            </tr>
-            <tr>
-                <td><strong>حساب قبلی (بدون این ماه)</strong></td>
-                <td><?= number_format($previousBalance) ?> تومان</td>
-            </tr>
-            <tr>
-                <td><strong>پرداختی‌ها تا این ماه</strong></td>
-                <td><?= number_format($totalPayments) ?> تومان</td>
-            </tr>
-            <tr style="background:#ffe0e0;">
-                <td><strong>مانده حساب نهایی</strong></td>
-                <td style="font-weight:bold; color:red;"><?= number_format($balance) ?> تومان</td>
-            </tr>
-        </table>
+          foreach($monthlyData[$selectedMonth]['products'] as $p):
+              $isReturn = !empty($p['is_return']) && intval($p['is_return'])===1;
+              if ($isReturn) {
+                  $totalReturnsQty   += (int)$p['quantity'];
+                  $totalReturnsPrice += (float)$p['total_price'];
+              } else {
+                  $totalQty   += (int)$p['quantity'];
+                  $totalPrice += (float)$p['total_price'];
+              }
+          ?>
+          <tr style="<?= $isReturn ? 'color:red; font-weight:bold;' : '' ?>">
+            <td><?= $i++ ?></td>
+            <td><?= htmlspecialchars($p['product_name']) ?></td>
+            <td><?= nf($p['unit_price']) ?> تومان</td>
+            <td><?= nf($p['quantity']) ?></td>
+            <td><?= nf($p['total_price']) ?> تومان</td>
+            <td><?= $isReturn ? 'مرجوعی' : 'خرید' ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
     </div>
 
-    <br>
+    <!-- جمع‌بندی -->
+    <h3 class="details-section-title" style="margin-top:var(--space-lg);">خلاصه حساب</h3>
+    <table class="details-products-table">
+      <tr><td><strong>تعداد کل خرید</strong></td><td><?= nf($totalQty) ?></td></tr>
+      <tr><td><strong>مبلغ کل خرید</strong></td><td><?= nf($totalPrice) ?> تومان</td></tr>
+      <tr><td><strong>تعداد کل مرجوعی</strong></td><td><?= nf($totalReturnsQty) ?></td></tr>
+      <tr><td><strong>مبلغ کل مرجوعی</strong></td><td style="color:red;"><?= nf($totalReturnsPrice) ?> تومان</td></tr>
+      <tr><td><strong>حساب قبلی (تا پایان ماه قبل)</strong></td><td><?= nf($previousBalance) ?> تومان</td></tr>
+      <tr><td><strong>پرداختی‌ها تا این ماه</strong></td><td><?= nf($totalPayments) ?> تومان</td></tr>
+      <tr style="background:#ffe0e0;">
+        <td><strong>مانده حساب نهایی</strong></td>
+        <td style="font-weight:bold; color:red;">
+          <?php
+            // مانده نهایی = (خرید ماه - مرجوعی‌های ماه) + حساب قبلی - پرداختی‌های تا این ماه
+            $final = ($totalPrice - $totalReturnsPrice) + $previousBalance - $totalPayments;
+            echo nf($final) . ' تومان';
+          ?>
+        </td>
+      </tr>
+    </table>
+  </div>
 
-    <!-- دکمه‌ها -->
-    <div style="text-align:center; margin-top:20px;">
-        <button onclick="printInvoice()" style="padding:10px 20px; margin:5px;">🖨 پرینت فاکتور</button>
-        <button onclick="saveInvoiceAsImage()" style="padding:10px 20px; margin:5px;">💾 ذخیره به عنوان عکس</button>
-    </div>
-
-    <!-- اسکریپت‌ها -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script>
-        function printInvoice() {
-            var printContents = document.getElementById("invoice-area").innerHTML;
-            var newWin = window.open("");
-            newWin.document.write("<html><head><title>پرینت فاکتور</title></head><body>" + printContents + "</body></html>");
-            newWin.document.close();
-            newWin.print();
-        }
-
-        function saveInvoiceAsImage() {
-            html2canvas(document.getElementById("invoice-area")).then(canvas => {
-                var link = document.createElement("a");
-                link.download = "invoice.png";
-                link.href = canvas.toDataURL();
-                link.click();
-            });
-        }
-
-    function printInvoice() {
-    window.print();
-}
-
-    </script>
+  <div class="details-action-buttons" style="text-align:center; margin-top:var(--space-lg);">
+    <button class="details-print-btn" onclick="window.print()"><i class="fas fa-print"></i> پرینت</button>
+    <a href="details.php?buyer_id=<?= $buyer_id ?>" class="details-back-btn"><i class="fas fa-arrow-right"></i> بازگشت</a>
+  </div>
 <?php endif; ?>
 
-    </div>
+</div>
 </body>
 </html>
