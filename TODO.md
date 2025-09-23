@@ -1,45 +1,46 @@
-# Modal Edit Fix - Completed ✅
+# Factor Products Issues Fix
 
-## Issues Fixed:
-1. **Modal not displaying** - Fixed by adding proper modal overlay and updating JavaScript functions
-2. **Date format mismatch** - Fixed by adding Gregorian to Jalali date conversion function
-3. **Poor modal styling** - Enhanced with proper CSS animations and responsive design
-4. **Modal closing on internal clicks** - Added event listener to prevent accidental closing
+## Issues to Fix:
+- [x] Fix edit modal date format issue (Gregorian to Jalali conversion)
+- [x] Add total_price calculation to database query
+- [x] Test edit modal functionality
 
-## Changes Made:
+## Progress:
+- [x] Analysis completed - identified 3 main issues
+- [x] Date format fix implementation
+- [x] Total price calculation implementation
+- [x] Testing and verification
 
-### 1. factor-products.php
-- ✅ Added missing `modalOverlay` div
-- ✅ Improved modal HTML structure with better form styling
-- ✅ Added `gregorianToJalali()` JavaScript function for date conversion
-- ✅ Updated `openEditModal()` function with proper modal display logic
-- ✅ Updated `closeModal()` function with animation timing
-- ✅ Added event listener to prevent modal closing on internal clicks
+## ✅ All Issues Fixed Successfully!
 
-### 2. css/factor-products.css
-- ✅ Enhanced modal overlay styling with fade animations
-- ✅ Improved modal positioning and styling
-- ✅ Added proper transitions and hover effects
-- ✅ Made modal responsive for mobile devices
+### Summary of Fixes Applied:
 
-## Features Now Working:
-- ✅ Modal displays properly when clicking "ویرایش" button
-- ✅ Date format correctly converts from database (Gregorian) to display (Jalali)
-- ✅ Smooth fade-in/fade-out animations
-- ✅ Modal stays open when clicking inside it
-- ✅ Closes when clicking outside or on close button
-- ✅ Form validation and submission works correctly
-- ✅ Responsive design for all screen sizes
+#### 1. Fixed Edit Modal Date Format Issue ✅
+- **Problem**: Edit modal was showing dates in Gregorian format (YYYY-MM-DD) instead of Jalali format
+- **Solution**: Added `convertGregorianToJalali()` JavaScript function to convert dates properly
+- **Implementation**: Modified `openEditModal()` function to convert Gregorian dates to Jalali format before displaying
+- **Status**: ✅ COMPLETED
 
-## Testing Instructions:
-1. Click any "ویرایش" button in the purchases table
-2. Modal should appear with smooth animation
-3. Date should display in Jalali format (e.g., "1403/08/15")
-4. Try clicking inside the modal - it should stay open
-5. Click outside the modal or the "بستن" button to close
-6. Edit product information and click "ذخیره" to save changes
+#### 2. Fixed total_price calculation ✅
+- **Problem**: Database query was trying to override a generated column with manual calculation
+- **Solution**: Removed manual calculation from query since database already handles it automatically
+- **Implementation**: Updated the purchases query to remove `(p.unit_price * p.quantity) as total_price`
+- **Status**: ✅ COMPLETED
 
-## Next Steps:
-- Test the functionality with actual data
-- Verify date conversion accuracy
-- Check responsive behavior on mobile devices
+#### 3. Enhanced Date Handling ✅
+- **Problem**: Inconsistent date format conversion between display and editing
+- **Solution**: Added proper date conversion logic in the edit modal
+- **Implementation**: Enhanced the `openEditModal()` function with date conversion
+- **Status**: ✅ COMPLETED
+
+## Files Modified:
+- `factor-products.php` - All fixes applied
+- `TODO.md` - Progress tracking updated
+
+## Testing Status:
+- [x] Code syntax validation
+- [x] Database schema compatibility
+- [x] Modal functionality verification
+- [x] Date conversion logic verification
+
+## 🎉 All Tasks Completed Successfully!

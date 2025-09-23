@@ -3,9 +3,12 @@ include 'db.php';
 include 'jalali_calendar.php';
 session_start();
 
-// گرفتن تاریخ جلالی امروز
+// تاریخ جلالی امروز
 list($jy, $jm, $jd) = gregorian_to_jalali(date('Y'), date('m'), date('d'));
 $current_jalali_date = sprintf('%04d/%02d/%02d', $jy, $jm, $jd);
+
+$error_message = "";
+$warning_message = "";
 
 // =======================
 // ذخیره خرید جدید
@@ -16,14 +19,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
     // اگر خریدار جدید وارد شد
     if ($buyer_id === 'new' || empty($buyer_id)) {
         $buyer_name = trim($_POST['buyer_name'] ?? '');
+
         if ($buyer_name !== '') {
-            $stmt = $conn->prepare("INSERT INTO buyers (name) VALUES (?)");
+            // بررسی وجود خریدار دقیق
+            $stmt = $conn->prepare("SELECT * FROM buyers WHERE name = ?");
             $stmt->execute([$buyer_name]);
-            $buyer_id = $conn->lastInsertId();
+            $existingBuyer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existingBuyer) {
+                $error_message = "❌ خریدار با نام «" . htmlspecialchars($buyer_name) . "» از قبل وجود دارد.";
+            } else {
+                // بررسی نام‌های مشابه
+                $stmt = $conn->prepare("SELECT name FROM buyers WHERE name LIKE ?");
+                $stmt->execute(['%' . $buyer_name . '%']);
+                $similarBuyers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($similarBuyers)) {
+                    $warning_message = "⚠️ توجه: نام‌های مشابهی در سیستم وجود دارد: " . implode("، ", $similarBuyers);
+                }
+
+                // ذخیره خریدار جدید
+                if (empty($error_message)) {
+                    $stmt = $conn->prepare("INSERT INTO buyers (name) VALUES (?)");
+                    $stmt->execute([$buyer_name]);
+                    $buyer_id = $conn->lastInsertId();
+                }
+            }
         }
     }
 
-    if (!empty($_POST['products']) && is_array($_POST['products'])) {
+    // ادامه ذخیره محصولات
+    if (empty($error_message) && !empty($_POST['products']) && is_array($_POST['products'])) {
         $insert = $conn->prepare("
             INSERT INTO purchases (buyer_id, product_name, unit_price, quantity, purchase_date, is_return)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -31,14 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
 
         foreach ($_POST['products'] as $p) {
             $name  = trim($p['product_name'] ?? '');
-            $price = floatval($p['unit_price'] ?? 0);
+            $price = floatval(str_replace([',','٬'], '', $p['unit_price'] ?? 0));
             $qty   = intval($p['quantity'] ?? 0);
             $date  = trim($p['purchase_date'] ?? '');
             $is_return = isset($p['is_return']) && $p['is_return'] == 1 ? 1 : 0;
 
             if ($name === '' || $price <= 0 || $qty <= 0 || $date === '') continue;
 
-            // تاریخ جلالی → میلادی
+            // تاریخ جلالی به میلادی
             if (strpos($date, '/') !== false) {
                 list($jy,$jm,$jd) = explode('/', $date);
                 list($gy,$gm,$gd) = jalali_to_gregorian($jy, $jm, $jd);
@@ -49,8 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
         }
     }
 
-    header("Location: factor-products.php");
-    exit;
+    if (empty($error_message)) {
+        header("Location: factor-products.php");
+        exit;
+    }
 }
 
 // =======================
@@ -59,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_purchase'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_purchase'])) {
     $id     = intval($_POST['edit_id']);
     $name   = trim($_POST['edit_product_name']);
-    $price  = floatval($_POST['edit_unit_price']);
+    $price  = floatval(str_replace([',','٬'], '', $_POST['edit_unit_price']));
     $qty    = intval($_POST['edit_quantity']);
     $date   = trim($_POST['edit_purchase_date']);
     $is_ret = intval($_POST['edit_is_return']);
@@ -94,14 +122,14 @@ if (isset($_GET['delete'])) {
 $buyers = $conn->query("SELECT * FROM buyers ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 $summary = $conn->query("
-    SELECT b.id, b.name, SUM(IF(is_return=1, -p.total_price, p.total_price)) as total
+    SELECT b.id, b.name, SUM(IF(is_return=1, -(p.unit_price * p.quantity), (p.unit_price * p.quantity))) as total
     FROM purchases p
     JOIN buyers b ON p.buyer_id=b.id
     GROUP BY b.id
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $purchases = $conn->query("
-    SELECT p.*, b.name as buyer_name
+    SELECT p.*, b.name as buyer_name, (p.unit_price * p.quantity) as total_price
     FROM purchases p
     JOIN buyers b ON p.buyer_id=b.id
     ORDER BY p.id DESC
@@ -128,18 +156,28 @@ $purchases = $conn->query("
     <form method="POST" id="purchaseForm">
         <h2>ثبت خرید جدید</h2>
         <label>انتخاب خریدار:</label>
-        <select name="buyer_id">
-            <option value="">-- خریدار جدید --</option>
+        <select name="buyer_id" id="buyerSelect">
+            <option value="">-- انتخاب خریدار --</option>
             <?php foreach($buyers as $b): ?>
                 <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <input type="text" name="buyer_name" placeholder="نام خریدار جدید">
+
+        <button type="button" id="showNewBuyerBtn">➕ افزودن خریدار جدید</button>
+        <div id="newBuyerInput" style="display:none; margin-top:5px;">
+            <input type="text" name="buyer_name" placeholder="نام خریدار جدید">
+        </div>
 
         <div id="products"></div>
-        <button type="button" onclick="addProductRow()">+ افزودن محصول</button>
-        <button type="submit" name="save_purchase">ذخیره خرید</button>
+        <button class="form_add_btn" type="button" onclick="addProductRow()">+ افزودن محصول</button>
+        <button class="form_save_btn" type="submit" name="save_purchase">ذخیره خرید</button>
     </form>
+
+    <?php if (!empty($error_message)): ?>
+        <p style="color:red;"><?= $error_message ?></p>
+    <?php elseif (!empty($warning_message)): ?>
+        <p style="color:orange;"><?= $warning_message ?></p>
+    <?php endif; ?>
 
     <!-- جدول خلاصه -->
     <h2>گزارش خریدها بر اساس خریدار</h2>
@@ -179,41 +217,25 @@ $purchases = $conn->query("
     </table>
 </div>
 
-<!-- Modal Overlay -->
+<!-- Modal -->
 <div class="modal-overlay" onclick="closeModal()"></div>
-
-<!-- Modal ویرایش -->
 <div class="modal" id="editModal">
     <h3>ویرایش خرید</h3>
-    <form method="POST">
+    <form method="POST" id="editForm">
         <input type="hidden" name="edit_id" id="edit_id">
-        <div style="margin-bottom: 15px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">نام محصول:</label>
-            <input type="text" name="edit_product_name" id="edit_product_name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        <div style="margin-bottom: 15px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">قیمت:</label>
-            <input type="number" name="edit_unit_price" id="edit_unit_price" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        <div style="margin-bottom: 15px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">تعداد:</label>
-            <input type="number" name="edit_quantity" id="edit_quantity" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        <div style="margin-bottom: 15px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">تاریخ:</label>
-            <input type="text" name="edit_purchase_date" id="edit_purchase_date" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">نوع:</label>
-            <select name="edit_is_return" id="edit_is_return" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        <div><label>نام محصول:</label><input type="text" name="edit_product_name" id="edit_product_name"></div>
+        <div><label>قیمت:</label><input type="text" name="edit_unit_price" id="edit_unit_price"></div>
+        <div><label>تعداد:</label><input type="number" name="edit_quantity" id="edit_quantity"></div>
+        <div><label>تاریخ:</label><input type="text" name="edit_purchase_date" id="edit_purchase_date"></div>
+        <div>
+            <label>نوع:</label>
+            <select name="edit_is_return" id="edit_is_return">
                 <option value="0">خرید</option>
                 <option value="1">مرجوعی</option>
             </select>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <button type="submit" name="update_purchase" style="flex: 1; padding: 10px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">ذخیره</button>
-            <button type="button" onclick="closeModal()" style="flex: 1; padding: 10px; background: #f3f4f6; color: #333; border: none; border-radius: 4px; cursor: pointer;">بستن</button>
-        </div>
+        <button type="submit" name="update_purchase">ذخیره</button>
+        <button type="button" onclick="closeModal()">بستن</button>
     </form>
 </div>
 
@@ -223,7 +245,7 @@ function addProductRow() {
     const div = document.createElement('div');
     div.innerHTML = `
         <input type="text" name="products[${rowIndex}][product_name]" placeholder="نام محصول" required>
-        <input type="number" name="products[${rowIndex}][unit_price]" placeholder="قیمت" required>
+        <input type="text" class="price-input" name="products[${rowIndex}][unit_price]" placeholder="قیمت" required>
         <input type="number" name="products[${rowIndex}][quantity]" placeholder="تعداد" required>
         <input type="text" name="products[${rowIndex}][purchase_date]" value="<?= $current_jalali_date ?>" required>
         <label><input type="radio" name="products[${rowIndex}][is_return]" value="0" checked> خرید</label>
@@ -233,82 +255,82 @@ function addProductRow() {
     document.getElementById('products').appendChild(div);
     rowIndex++;
 }
-// تابع تبدیل تاریخ میلادی به شمسی
-function gregorianToJalali(gregorianDate) {
-    if (!gregorianDate || gregorianDate === '0000-00-00') return '';
 
-    const parts = gregorianDate.split('-');
-    if (parts.length !== 3) return gregorianDate;
-
-    const gy = parseInt(parts[0]);
-    const gm = parseInt(parts[1]);
-    const gd = parseInt(parts[2]);
-
-    if (gy === 0 || gm === 0 || gd === 0) return '';
-
-    // استفاده از تابع PHP از طریق AJAX یا محاسبه ساده
-    // برای سادگی از محاسبه ساده استفاده می‌کنیم
-    const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-    const jy = (gy <= 1600) ? 0 : 979;
-    const gy2 = gy - ((gy <= 1600) ? 621 : 1600);
-    let days = (365 * gy2) + parseInt((gy2 + 3) / 4) - parseInt((gy2 + 99) / 100) + parseInt((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1] + ((gm > 2 && gy2 % 4 === 0 && (gy2 % 100 !== 0 || gy2 % 400 === 0)) ? 1 : 0) - 1;
-
-    let jy2 = 33 * parseInt(days / 12053);
-    days %= 12053;
-    jy2 += 4 * parseInt(days / 1461);
-    days %= 1461;
-    jy2 += parseInt((days - 1) / 365);
-    if (days > 365) days = (days - 1) % 365;
-    const jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
-    const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
-
-    return jy + jy2 + '/' + (jm < 10 ? '0' : '') + jm + '/' + (jd < 10 ? '0' : '') + jd;
+// فرمت سه‌رقمی قیمت
+function formatPriceInput(input) {
+    let value = input.value.replace(/[^\d]/g, "");
+    if (value === "") {
+        input.value = "";
+        return;
+    }
+    input.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+document.addEventListener("input", function(e) {
+    if (e.target.classList.contains("price-input")) {
+        formatPriceInput(e.target);
+    }
+});
+
+// حذف جداکننده قبل از ارسال
+document.getElementById("purchaseForm").addEventListener("submit", function() {
+    document.querySelectorAll(".price-input").forEach(inp => {
+        inp.value = inp.value.replace(/[^\d]/g, "");
+    });
+});
+document.getElementById("editForm").addEventListener("submit", function() {
+    document.getElementById("edit_unit_price").value = document.getElementById("edit_unit_price").value.replace(/[^\d]/g, "");
+});
 
 function openEditModal(p) {
-    // تنظیم مقادیر فرم
     document.getElementById('edit_id').value = p.id;
     document.getElementById('edit_product_name').value = p.product_name || '';
-    document.getElementById('edit_unit_price').value = p.unit_price || '';
+    document.getElementById('edit_unit_price').value = (p.unit_price+"").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     document.getElementById('edit_quantity').value = p.quantity || '';
     document.getElementById('edit_is_return').value = p.is_return || 0;
 
-    // تبدیل تاریخ میلادی به شمسی
-    const jalaliDate = gregorianToJalali(p.purchase_date);
-    document.getElementById('edit_purchase_date').value = jalaliDate;
+    // تاریخ جلالی
+    if (p.purchase_date && p.purchase_date.includes('-')) {
+        const parts = p.purchase_date.split('-');
+        const gy = parseInt(parts[0]), gm = parseInt(parts[1]), gd = parseInt(parts[2]);
+        const jalaliDate = convertGregorianToJalali(gy, gm, gd);
+        document.getElementById('edit_purchase_date').value = jalaliDate;
+    } else {
+        document.getElementById('edit_purchase_date').value = p.purchase_date || '';
+    }
 
-    // نمایش مودال
-    const modalOverlay = document.querySelector('.modal-overlay');
-    const editModal = document.getElementById('editModal');
+    document.querySelector('.modal-overlay').style.display = 'block';
+    document.getElementById('editModal').style.display = 'block';
+}
 
-    modalOverlay.style.display = 'block';
-    editModal.style.display = 'block';
-
-    // اضافه کردن کلاس show برای انیمیشن
-    setTimeout(() => {
-        modalOverlay.classList.add('show');
-        editModal.classList.add('show');
-    }, 10);
+function convertGregorianToJalali(gy, gm, gd) {
+    const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    let jy = (gy <= 1600) ? 0 : 979;
+    gy -= (gy <= 1600) ? 621 : 1600;
+    let gy2 = (gm > 2) ? (gy + 1) : gy;
+    let days = (365 * gy) + parseInt((gy2 + 3) / 4) - parseInt((gy2 + 99) / 100) + parseInt((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+    jy += 33 * parseInt(days / 12053);
+    days %= 12053;
+    jy += 4 * parseInt(days / 1461);
+    days %= 1461;
+    if (days > 365) {
+        jy += parseInt((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+    const jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
+    const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+    return jy + "/" + jm.toString().padStart(2, '0') + "/" + jd.toString().padStart(2, '0');
 }
 
 function closeModal() {
-    // مخفی کردن مودال
-    const modalOverlay = document.querySelector('.modal-overlay');
-    const editModal = document.getElementById('editModal');
-
-    modalOverlay.classList.remove('show');
-    editModal.classList.remove('show');
-
-    // مخفی کردن کامل بعد از انیمیشن
-    setTimeout(() => {
-        modalOverlay.style.display = 'none';
-        editModal.style.display = 'none';
-    }, 300);
+    document.querySelector('.modal-overlay').style.display = 'none';
+    document.getElementById('editModal').style.display = 'none';
 }
 
-// جلوگیری از بسته شدن مودال با کلیک داخل آن
-document.getElementById('editModal').addEventListener('click', function(e) {
-    e.stopPropagation();
+// نمایش input خریدار جدید
+document.getElementById('showNewBuyerBtn').addEventListener('click', function() {
+    document.getElementById('newBuyerInput').style.display = 'block';
+    document.getElementById('buyerSelect').value = '';
+    this.style.display = 'none';
 });
 </script>
 </body>
