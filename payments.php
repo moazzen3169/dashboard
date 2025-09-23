@@ -166,8 +166,8 @@ $buyers = getBuyers($conn);
           </div>
           <div class="field">
             <label>مبلغ پرداختی (تومان):</label>
-            <input type="number" name="amount" required>
-          </div>
+            <input type="text" name="amount" id="amount" required>
+            </div>
         </div>
         <div class="form-row">
           <div class="field">
@@ -226,8 +226,8 @@ $buyers = getBuyers($conn);
           </div>
           <div class="field">
             <label>مبلغ:</label>
-            <input type="number" name="amount" id="edit_amount" required>
-          </div>
+            <input type="text" name="amount" id="amount" required>
+            </div>
         </div>
         <div class="form-row">
           <div class="field">
@@ -272,5 +272,36 @@ $buyers = getBuyers($conn);
       document.getElementById(id).classList.remove('active');
     }
   </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const amountInputs = document.querySelectorAll('input[name="amount"], #edit_amount');
+
+  amountInputs.forEach(function (input) {
+    input.addEventListener("input", function () {
+      // فقط رقم رو نگه می‌داریم (اعداد فارسی هم پشتیبانی بشه)
+      let value = this.value.replace(/[^\d]/g, "");
+
+      // اگه مقداری وجود داشت، فرمت هزارگان بزن
+      if (value !== "") {
+        this.value = new Intl.NumberFormat('en-US').format(value);
+      } else {
+        this.value = "";
+      }
+    });
+  });
+
+  // قبل از ارسال فرم، کاماها حذف بشن
+  document.querySelectorAll("form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      amountInputs.forEach(function (input) {
+        input.value = input.value.replace(/,/g, "");
+      });
+    });
+  });
+});
+</script>
+
+  
 </body>
 </html>
