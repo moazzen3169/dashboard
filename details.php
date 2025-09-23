@@ -7,6 +7,17 @@ function nf($v) {
     return number_format((float)($v ?? 0));
 }
 
+/** تعداد روزهای یک ماه جلالی */
+function jalali_days_in_month($jy, $jm) {
+    if ($jm <= 6) return 31;
+    if ($jm <= 11) return 30;
+    // تشخیص 29/30 بودن اسفند
+    $g = jalali_to_gregorian($jy, $jm, 30);
+    list($gy,$gm,$gd) = $g;
+    list($jjy,$jjm,$jjd) = gregorian_to_jalali($gy, $gm, $gd);
+    return ($jjy == $jy && $jjm == $jm && $jjd == 30) ? 30 : 29;
+}
+
 $buyer_id = intval($_GET['buyer_id'] ?? 0);
 if ($buyer_id <= 0) {
     die("خریدار نامعتبر است");
@@ -28,8 +39,7 @@ $purchases = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // گروه‌بندی بر اساس ماه جلالی
 $grouped = [];
 foreach ($purchases as $p) {
-    // سازگاری با ردیف‌های قدیمی که is_return ندارند
-    $isReturn = !empty($p['is_return']) && intval($p['is_return']) === 1;
+    $isReturn = isset($p['is_return']) && intval($p['is_return']) === 1;
 
     list($gy,$gm,$gd) = explode('-', $p['purchase_date']);
     list($jy,$jm,$jd) = gregorian_to_jalali($gy, $gm, $gd);
@@ -38,14 +48,13 @@ foreach ($purchases as $p) {
     if (!isset($grouped[$monthKey])) {
         $grouped[$monthKey] = [
             'products'    => [],
-            'total_price' => 0.0,
+            'total_price' => 0.0, // خالص ماه (خرید - مرجوعی)
             'total_qty'   => 0
         ];
     }
 
     $grouped[$monthKey]['products'][] = $p;
 
-    // خرید عادی + ، مرجوعی -
     if ($isReturn) {
         $grouped[$monthKey]['total_price'] -= (float)$p['total_price'];
         $grouped[$monthKey]['total_qty']   -= (int)$p['quantity'];
@@ -59,19 +68,17 @@ foreach ($purchases as $p) {
 $monthlyData = [];
 foreach ($grouped as $month => $data) {
     list($jy, $jm) = explode('/', $month);
-
+    $daysInMonth = jalali_days_in_month($jy, $jm);
     $startOfMonthGregorian = jalali_to_gregorian($jy, $jm, 1);
-    $endOfMonthGregorian   = jalali_to_gregorian($jy, $jm, 31);
+    $endOfMonthGregorian   = jalali_to_gregorian($jy, $jm, $daysInMonth);
 
     $startDate = sprintf("%04d-%02d-%02d", $startOfMonthGregorian[0], $startOfMonthGregorian[1], $startOfMonthGregorian[2]);
     $endDate   = sprintf("%04d-%02d-%02d", $endOfMonthGregorian[0], $endOfMonthGregorian[1], $endOfMonthGregorian[2]);
 
-    // پرداختی‌های همان ماه
     $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date BETWEEN ? AND ?");
     $stmt->execute([$buyer_id, $startDate, $endDate]);
     $monthPayments = (float)($stmt->fetchColumn() ?: 0);
 
-    // مانده حساب تا پایان این ماه (با احتساب مرجوعی)
     $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endDate]);
     $totalPurchases = (float)($stmt->fetchColumn() ?: 0);
@@ -93,16 +100,23 @@ foreach ($grouped as $month => $data) {
 
 $selectedMonth = $_GET['month'] ?? null;
 
-// متغیرهای خلاصه ماه – مقداردهی امن
-$previousBalance = 0.0;
-$totalPayments   = 0.0;
-$balance         = 0.0;
+$previousBalance    = 0.0;
+$totalPayments      = 0.0;
+$balance            = 0.0;
+$paymentsThisMonth  = 0.0;
 
 if ($selectedMonth) {
     list($jy, $jm) = explode('/', $selectedMonth);
+    $daysInMonth = jalali_days_in_month($jy, $jm);
 
-    $endOfMonthGregorian = jalali_to_gregorian($jy, $jm, 31);
-    $endOfMonthDate = sprintf("%04d-%02d-%02d", $endOfMonthGregorian[0], $endOfMonthGregorian[1], $endOfMonthGregorian[2]);
+    $startOfMonthGregorian = jalali_to_gregorian($jy, $jm, 1);
+    $endOfMonthGregorian   = jalali_to_gregorian($jy, $jm, $daysInMonth);
+    $startOfMonthDate = sprintf("%04d-%02d-%02d", $startOfMonthGregorian[0], $startOfMonthGregorian[1], $startOfMonthGregorian[2]);
+    $endOfMonthDate   = sprintf("%04d-%02d-%02d", $endOfMonthGregorian[0], $endOfMonthGregorian[1], $endOfMonthGregorian[2]);
+
+    $stmt = $conn->prepare("SELECT SUM(amount) FROM payments WHERE buyer_id=? AND payment_date BETWEEN ? AND ?");
+    $stmt->execute([$buyer_id, $startOfMonthDate, $endOfMonthDate]);
+    $paymentsThisMonth = (float)($stmt->fetchColumn() ?: 0);
 
     $prevMonth = (int)$jm - 1;
     $prevYear  = (int)$jy;
@@ -110,10 +124,10 @@ if ($selectedMonth) {
         $prevMonth = 12;
         $prevYear--;
     }
-    $endOfPrevMonthGregorian = jalali_to_gregorian($prevYear, $prevMonth, 31);
+    $prevDays = jalali_days_in_month($prevYear, $prevMonth);
+    $endOfPrevMonthGregorian = jalali_to_gregorian($prevYear, $prevMonth, $prevDays);
     $endOfPrevMonthDate = sprintf("%04d-%02d-%02d", $endOfPrevMonthGregorian[0], $endOfPrevMonthGregorian[1], $endOfPrevMonthGregorian[2]);
 
-    // حساب قبلی (تا پایان ماه قبل) با احتساب مرجوعی
     $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endOfPrevMonthDate]);
     $purchasesPrev = (float)($stmt->fetchColumn() ?: 0);
@@ -124,7 +138,6 @@ if ($selectedMonth) {
 
     $previousBalance = $purchasesPrev - $paymentsPrev;
 
-    // خرید و پرداخت تا پایان ماه انتخاب‌شده
     $stmt = $conn->prepare("SELECT SUM(IF(is_return=1, -total_price, total_price)) FROM purchases WHERE buyer_id=? AND purchase_date <= ?");
     $stmt->execute([$buyer_id, $endOfMonthDate]);
     $totalPurchases = (float)($stmt->fetchColumn() ?: 0);
@@ -135,15 +148,16 @@ if ($selectedMonth) {
 
     $balance = $totalPurchases - $totalPayments;
 
-    // اطمینان از وجود کلید برای ماه انتخاب‌شده حتی اگر خریدی نبوده
     if (!isset($monthlyData[$selectedMonth])) {
         $monthlyData[$selectedMonth] = [
             'total_qty'     => 0,
             'total_price'   => 0.0,
-            'monthPayments' => 0.0,
+            'monthPayments' => $paymentsThisMonth,
             'balance'       => $balance,
             'products'      => []
         ];
+    } else {
+        $monthlyData[$selectedMonth]['monthPayments'] = $paymentsThisMonth;
     }
 }
 ?>
@@ -158,12 +172,13 @@ if ($selectedMonth) {
 <link rel="stylesheet" href="css/design-system.css">
 <link rel="stylesheet" href="css/details.css">
 <style>
-/* فقط فاکتور چاپ شود */
 @media print {
   body * { visibility: hidden !important; }
   #invoice-area, #invoice-area * { visibility: visible !important; }
   #invoice-area { position:absolute; inset:0; width:100%; }
 }
+.calc-steps { background:#f9f9f9; padding:10px; border-radius:8px; margin-top:20px; }
+.calc-steps li { margin:5px 0; }
 </style>
 </head>
 <body class="dashboard-container">
@@ -179,9 +194,9 @@ if ($selectedMonth) {
           <tr>
             <th>ماه</th>
             <th>تعداد محصولات</th>
-            <th>مجموع مبلغ</th>
+            <th>مجموع مبلغ (خالص ماه)</th>
             <th>پرداختی همان ماه</th>
-            <th>مانده حساب نهایی</th>
+            <th>مانده پایان ماه (تجمیعی)</th>
             <th>عملیات</th>
           </tr>
         </thead>
@@ -207,17 +222,30 @@ if ($selectedMonth) {
 
 <?php else: ?>
   <?php
-  // تاریخ صدور فاکتور (شمسی)
   list($gy,$gm,$gd) = explode('-', date("Y-m-d"));
   list($jy,$jm,$jd) = gregorian_to_jalali($gy, $gm, $gd);
   $jalaliDate = sprintf("%04d/%02d/%02d", $jy, $jm, $jd);
   $invoiceNumber = $buyer_id . str_replace("/", "", $selectedMonth);
-  ?>
 
+  $totalQty=0; $totalPrice=0.0; $totalReturnsQty=0; $totalReturnsPrice=0.0;
+  foreach($monthlyData[$selectedMonth]['products'] as $p){
+      $isReturn = isset($p['is_return']) && intval($p['is_return'])===1;
+      if ($isReturn) {
+          $totalReturnsQty   += (int)$p['quantity'];
+          $totalReturnsPrice += (float)$p['total_price'];
+      } else {
+          $totalQty   += (int)$p['quantity'];
+          $totalPrice += (float)$p['total_price'];
+      }
+  }
+  $netMonth = $totalPrice - $totalReturnsPrice;
+  $finalInvoiceAmount = $netMonth - $paymentsThisMonth;
+  ?>
+  
   <div id="invoice-area" class="details-fade-in">
     <h2 class="details-section-title" style="text-align:center;">🧾 فاکتور ماه <?= htmlspecialchars($selectedMonth) ?></h2>
 
-    <!-- سربرگ فاکتور -->
+    <!-- سربرگ -->
     <table class="details-products-table" style="margin-bottom:var(--space-md);">
       <tr style="background:#f7f7f7;">
         <td><strong>ماه:</strong> <?= htmlspecialchars($selectedMonth) ?></td>
@@ -232,37 +260,13 @@ if ($selectedMonth) {
       </tr>
     </table>
 
-    <!-- جدول محصولات -->
+    <!-- محصولات -->
     <div class="table-responsive">
       <table class="details-products-table">
-        <thead>
-          <tr>
-            <th>ردیف</th>
-            <th>نام محصول</th>
-            <th>قیمت فی</th>
-            <th>تعداد</th>
-            <th>جمع</th>
-            <th>نوع</th>
-          </tr>
-        </thead>
+        <thead><tr><th>ردیف</th><th>نام محصول</th><th>قیمت فی</th><th>تعداد</th><th>جمع</th><th>نوع</th></tr></thead>
         <tbody>
-          <?php
-          $i=1;
-          $totalQty = 0;            // خرید عادی
-          $totalPrice = 0.0;        // خرید عادی
-          $totalReturnsQty = 0;     // مرجوعی
-          $totalReturnsPrice = 0.0; // مرجوعی
-
-          foreach($monthlyData[$selectedMonth]['products'] as $p):
-              $isReturn = !empty($p['is_return']) && intval($p['is_return'])===1;
-              if ($isReturn) {
-                  $totalReturnsQty   += (int)$p['quantity'];
-                  $totalReturnsPrice += (float)$p['total_price'];
-              } else {
-                  $totalQty   += (int)$p['quantity'];
-                  $totalPrice += (float)$p['total_price'];
-              }
-          ?>
+        <?php $i=1; foreach($monthlyData[$selectedMonth]['products'] as $p): 
+            $isReturn = isset($p['is_return']) && intval($p['is_return'])===1; ?>
           <tr style="<?= $isReturn ? 'color:red; font-weight:bold;' : '' ?>">
             <td><?= $i++ ?></td>
             <td><?= htmlspecialchars($p['product_name']) ?></td>
@@ -271,31 +275,36 @@ if ($selectedMonth) {
             <td><?= nf($p['total_price']) ?> تومان</td>
             <td><?= $isReturn ? 'مرجوعی' : 'خرید' ?></td>
           </tr>
-          <?php endforeach; ?>
+        <?php endforeach; ?>
         </tbody>
       </table>
     </div>
 
-    <!-- جمع‌بندی -->
+    <!-- خلاصه حساب -->
     <h3 class="details-section-title" style="margin-top:var(--space-lg);">خلاصه حساب</h3>
     <table class="details-products-table">
-      <tr><td><strong>تعداد کل خرید</strong></td><td><?= nf($totalQty) ?></td></tr>
-      <tr><td><strong>مبلغ کل خرید</strong></td><td><?= nf($totalPrice) ?> تومان</td></tr>
-      <tr><td><strong>تعداد کل مرجوعی</strong></td><td><?= nf($totalReturnsQty) ?></td></tr>
-      <tr><td><strong>مبلغ کل مرجوعی</strong></td><td style="color:red;"><?= nf($totalReturnsPrice) ?> تومان</td></tr>
-      <tr><td><strong>حساب قبلی (تا پایان ماه قبل)</strong></td><td><?= nf($previousBalance) ?> تومان</td></tr>
-      <tr><td><strong>پرداختی‌ها تا این ماه</strong></td><td><?= nf($totalPayments) ?> تومان</td></tr>
-      <tr style="background:#ffe0e0;">
-        <td><strong>مانده حساب نهایی</strong></td>
-        <td style="font-weight:bold; color:red;">
-          <?php
-            // مانده نهایی = (خرید ماه - مرجوعی‌های ماه) + حساب قبلی - پرداختی‌های تا این ماه
-            $final = ($totalPrice - $totalReturnsPrice) + $previousBalance - $totalPayments;
-            echo nf($final) . ' تومان';
-          ?>
-        </td>
-      </tr>
+      <tr><td>مبلغ کل خرید</td><td><?= nf($totalPrice) ?> تومان</td></tr>
+      <tr><td>مبلغ کل مرجوعی</td><td><?= nf($totalReturnsPrice) ?> تومان</td></tr>
+      <tr><td>خالص خرید ماه</td><td><?= nf($netMonth) ?> تومان</td></tr>
+      <tr><td>پرداختی همان ماه</td><td><?= nf($paymentsThisMonth) ?> تومان</td></tr>
+      <tr style="background:#ffe0e0;"><td>مبلغ نهایی فاکتور ماه</td><td><?= nf($finalInvoiceAmount) ?> تومان</td></tr>
+      <tr><td>حساب قبلی</td><td><?= nf($previousBalance) ?> تومان</td></tr>
+      <tr><td>مانده پایان ماه (تجمیعی)</td><td><?= nf($balance) ?> تومان</td></tr>
     </table>
+
+    <!-- روند محاسبه -->
+    <h3 class="details-section-title">🧮 روند محاسبه</h3>
+    <div class="calc-steps">
+      <ol>
+        <li>مبلغ کل خرید ماه: <?= nf($totalPrice) ?> تومان</li>
+        <li>منهای مرجوعی‌ها: <?= nf($totalReturnsPrice) ?> تومان</li>
+        <li>= خالص خرید ماه: <?= nf($netMonth) ?> تومان</li>
+        <li>منهای پرداختی همان ماه: <?= nf($paymentsThisMonth) ?> تومان</li>
+        <li>= مبلغ نهایی فاکتور ماه: <?= nf($finalInvoiceAmount) ?> تومان</li>
+        <li>اضافه می‌شود حساب قبلی: <?= nf($previousBalance) ?> تومان</li>
+        <li>= مانده پایان ماه (تجمیعی): <?= nf($balance) ?> تومان</li>
+      </ol>
+    </div>
   </div>
 
   <div class="details-action-buttons" style="text-align:center; margin-top:var(--space-lg);">
