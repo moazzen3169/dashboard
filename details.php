@@ -173,12 +173,20 @@ if ($selectedMonth) {
 <link rel="stylesheet" href="css/details.css">
 <style>
 @media print {
-  body * { visibility: hidden !important; }
+  body * { visibility: hidden !important;}
   #invoice-area, #invoice-area * { visibility: visible !important; }
   #invoice-area { position:absolute; inset:0; width:100%; }
 }
 .calc-steps { background:#f9f9f9; padding:10px; border-radius:8px; margin-top:20px; }
 .calc-steps li { margin:5px 0; }
+.details-main-content{
+  max-width: 1000px;
+  margin: 0px auto;
+}
+
+.details-products-table{
+  margin-top: 20px;
+}
 </style>
 </head>
 <body class="dashboard-container">
@@ -243,7 +251,6 @@ if ($selectedMonth) {
   ?>
   
   <div id="invoice-area" class="details-fade-in">
-    <h2 class="details-section-title" style="text-align:center;">🧾 فاکتور ماه <?= htmlspecialchars($selectedMonth) ?></h2>
 
     <!-- سربرگ -->
     <table class="details-products-table" style="margin-bottom:var(--space-md);">
@@ -281,7 +288,6 @@ if ($selectedMonth) {
     </div>
 
     <!-- خلاصه حساب -->
-    <h3 class="details-section-title" style="margin-top:var(--space-lg);">خلاصه حساب</h3>
     <table class="details-products-table">
       <tr><td>مبلغ کل خرید</td><td><?= nf($totalPrice) ?> تومان</td></tr>
       <tr><td>مبلغ کل مرجوعی</td><td><?= nf($totalReturnsPrice) ?> تومان</td></tr>
@@ -292,19 +298,7 @@ if ($selectedMonth) {
       <tr><td>مانده پایان ماه (تجمیعی)</td><td><?= nf($balance) ?> تومان</td></tr>
     </table>
 
-    <!-- روند محاسبه -->
-    <h3 class="details-section-title">🧮 روند محاسبه</h3>
-    <div class="calc-steps">
-      <ol>
-        <li>مبلغ کل خرید ماه: <?= nf($totalPrice) ?> تومان</li>
-        <li>منهای مرجوعی‌ها: <?= nf($totalReturnsPrice) ?> تومان</li>
-        <li>= خالص خرید ماه: <?= nf($netMonth) ?> تومان</li>
-        <li>منهای پرداختی همان ماه: <?= nf($paymentsThisMonth) ?> تومان</li>
-        <li>= مبلغ نهایی فاکتور ماه: <?= nf($finalInvoiceAmount) ?> تومان</li>
-        <li>اضافه می‌شود حساب قبلی: <?= nf($previousBalance) ?> تومان</li>
-        <li>= مانده پایان ماه (تجمیعی): <?= nf($balance) ?> تومان</li>
-      </ol>
-    </div>
+
   </div>
 
   <div class="details-action-buttons" style="text-align:center; margin-top:var(--space-lg);">
