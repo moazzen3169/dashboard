@@ -923,4 +923,4 @@ $product = $_GET['product'] ?? '';
         });
     </script>
 </body>
-</html>
+</html>     
