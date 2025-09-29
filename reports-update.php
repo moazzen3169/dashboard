@@ -81,12 +81,10 @@ class SalesReport {
         return $this->filters ? "WHERE " . implode(" AND ", $this->filters) : "";
     }
 
-    // متد جدید برای دسترسی به پارامترها
     public function getParams() {
         return $this->params;
     }
 
-    // متد جدید برای گرفتن تمام داده‌های فیلتر
     public function getFilterData() {
         return [
             'where' => $this->getWhereClause(),
@@ -116,7 +114,6 @@ class SalesReport {
     public function getMonthlyReport() {
         $whereSQL = $this->getWhereClause();
 
-        // کوئری بهینه‌شده برای گزارش ماهانه
         $stmt = $this->conn->prepare("
             SELECT
                 YEAR(purchase_date) as year,
@@ -145,14 +142,12 @@ class SalesReport {
                 'percentPaid' => 0
             ];
 
-            // محاسبه درصد پرداختی
             if ($row['total_price'] > 0) {
                 $result[$monthKey]['percentPaid'] = round(
                     ($result[$monthKey]['payments'] / $row['total_price']) * 100, 1
                 );
             }
 
-            // اضافه کردن محصول و مشتری برتر
             $topProduct = $this->getTopProductForMonth($jy, $jm);
             $result[$monthKey]['topProduct'] = $topProduct;
             $result[$monthKey]['topCustomer'] = $this->getTopCustomerForProductInMonth($jy, $jm, $topProduct);
@@ -275,7 +270,6 @@ class SalesReport {
         ];
     }
 
-    // متد جدید برای گرفتن تمام خریدها با فیلترهای اعمال شده
     public function getAllPurchases() {
         $whereSQL = $this->getWhereClause();
         $stmt = $this->conn->prepare("SELECT *, IF(is_return=1, -total_price, total_price) as net_total_price FROM purchases $whereSQL");
@@ -283,7 +277,6 @@ class SalesReport {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // متد جدید برای گرفتن پرداختی‌های هر کاربر با گروه‌بندی
     public function getUserPayments() {
         $stmt = $this->conn->prepare("
             SELECT
@@ -299,10 +292,37 @@ class SalesReport {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // متد جدید برای گرفتن کل پرداختی‌ها
-    public function getTotalPayments() {
-        $stmt = $this->conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payments");
-        $stmt->execute();
+    public function getFilteredTotalPayments() {
+        $paymentFilters = [];
+        $paymentParams = [];
+
+        $from = $_GET['from'] ?? '';
+        $to = $_GET['to'] ?? '';
+        $buyer_id = $_GET['buyer_id'] ?? '';
+
+        try {
+            if ($from && $to) {
+                $fromGreg = $this->validateAndConvertDate($from);
+                $toGreg = $this->validateAndConvertDate($to);
+
+                if ($fromGreg && $toGreg) {
+                    $paymentFilters[] = "payment_date BETWEEN ? AND ?";
+                    $paymentParams[] = $fromGreg;
+                    $paymentParams[] = $toGreg;
+                }
+            }
+
+            if ($buyer_id && is_numeric($buyer_id)) {
+                $paymentFilters[] = "buyer_id = ?";
+                $paymentParams[] = intval($buyer_id);
+            }
+        } catch (Exception $e) {
+            error_log("خطا در اعمال فیلترهای پرداختی: " . $e->getMessage());
+        }
+
+        $whereSQL = $paymentFilters ? "WHERE " . implode(" AND ", $paymentFilters) : "";
+        $stmt = $this->conn->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payments $whereSQL");
+        $stmt->execute($paymentParams);
         return $stmt->fetchColumn();
     }
 }
@@ -314,12 +334,12 @@ try {
     
     $dailyReport = $report->getDailyReport();
     $monthlyReport = $report->getMonthlyReport();
-    $allPurchases = $report->getAllPurchases(); // استفاده از متد جدید
+    $allPurchases = $report->getAllPurchases();
     
     $overallStats = $report->getOverallStats($allPurchases);
     $bests = $report->getBests();
     $userPayments = $report->getUserPayments();
-    $totalPayments = $report->getTotalPayments();
+    $totalPayments = $report->getFilteredTotalPayments();
 
 } catch (Exception $e) {
     error_log("خطا در تولید گزارش: " . $e->getMessage());
@@ -337,307 +357,383 @@ $product = $_GET['product'] ?? '';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📊 گزارش فروش بهینه‌شده</title>
-    <link rel="stylesheet" href="fonts/fonts.css">
+    <title>گزارش‌های فروش - تولیدی الماس</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/design-system.css">
-    <link rel="stylesheet" href="css/sidebar.css">
-    <link rel="stylesheet" href="css/reports-update.css">
     <style>
-        .error-message {
-            background: #ffe0e0;
-            color: #d00;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            border: 1px solid #ffb3b3;
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+        
+        /* Print styles */
+        @media print {
+            .no-print { display: none !important; }
+            body { 
+                background: white !important;
+                font-size: 12pt;
+            }
+            .print-break { page-break-inside: avoid; }
+            .print-full { width: 100% !important; }
         }
         
-        .loading-spinner {
-            display: none;
-            text-align: center;
-            padding: 20px;
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
         }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-            border-right: 4px solid #007bff;
         }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .stat-label {
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        .filter-form {
-            background: #f8f9fa;
-            padding: 20px;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
             border-radius: 10px;
-            margin: 20px 0;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
         
-        .filter-form input,
-        .filter-form select {
-            margin: 0 10px 10px 0;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+        /* Progress bar animation */
+        .progress-bar {
+            transition: width 0.6s ease;
         }
         
-        .filter-form button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        
-        .report-table {
+        /* Chart container responsive */
+        .chart-container {
+            position: relative;
+            height: 400px;
             width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .report-table th,
-        .report-table td {
-            padding: 12px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .report-table th {
-            background: #007bff;
-            color: white;
-        }
-        
-        .report-table tr:hover {
-            background: #f5f5f5;
-        }
-        
-        .low-sales {
-            background: #fff3cd !important;
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 300px;
+            }
         }
     </style>
 </head>
-<body class="dashboard-container">
-    <aside class="sidebar"><?php include 'sidebar.php'; ?></aside>
-    
-    <div class="main-content">
-        <header class="top-bar">
-            <h1 class="h1">📊 گزارش فروش بهینه‌شده</h1>
-        </header>
-        
-        <div class="content-area">
-            <!-- نمایش خطاها -->
-            <?php if (isset($e)): ?>
-                <div class="error-message">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    خطا در تولید گزارش: <?= htmlspecialchars($e->getMessage()) ?>
-                </div>
-            <?php endif; ?>
+<body class="bg-gray-50 min-h-screen">
+    <div class="flex w-full">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-blue-900 text-white min-h-screen flex-shrink-0">
+            <?php include 'sidebar.php'; ?>
+        </aside>
 
-            <!-- آمار کلی -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value"><?= number_format($overallStats['totalPurchases']) ?></div>
-                    <div class="stat-label">کل تعداد فروش</div>
+        <!-- Main Content -->
+        <div class="flex-1 w-full min-w-0 p-6">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-chart-bar ml-2 text-blue-600"></i>
+                    گزارش‌های جامع فروش
+                </h1>
+                <p class="text-gray-600">تحلیل و بررسی عملکرد فروش و مالی</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 print-break">
+                <div class="bg-white rounded-xl shadow-lg p-6 border-r-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm mb-1">کل فروش</p>
+                            <h3 class="text-2xl font-bold text-gray-800"><?= number_format($overallStats['totalPurchases']) ?></h3>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-green-600 text-sm mt-2">
+                        <i class="fas fa-arrow-up ml-1"></i>
+                        میانگین روزانه: <?= number_format($overallStats['averageDaily']) ?>
+                    </p>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= number_format($overallStats['totalRevenue']) ?></div>
-                    <div class="stat-label">کل درآمد (ریال)</div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 border-r-4 border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm mb-1">درآمد کل</p>
+                            <h3 class="text-2xl font-bold text-gray-800"><?= number_format($overallStats['totalRevenue']) ?> ریال</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-money-bill-wave text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-blue-600 text-sm mt-2">
+                        <i class="fas fa-calendar ml-1"></i>
+                        <?= $overallStats['uniqueDays'] ?> روز فعال
+                    </p>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= number_format($totalPayments) ?></div>
-                    <div class="stat-label">کل پرداختی‌ها (ریال)</div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 border-r-4 border-purple-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm mb-1">پرداختی‌ها</p>
+                            <h3 class="text-2xl font-bold text-gray-800"><?= number_format($totalPayments) ?> ریال</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-credit-card text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mt-2">
+                        <i class="fas fa-users ml-1"></i>
+                        <?= count($userPayments) ?> مشتری
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 border-r-4 border-orange-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm mb-1">موجودی</p>
+                            <h3 class="text-2xl font-bold text-gray-800">
+                                <?= number_format($overallStats['totalRevenue'] - $totalPayments) ?> ریال
+                            </h3>
+                        </div>
+                        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-wallet text-orange-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mt-2">
+                        <i class="fas fa-chart-line ml-1"></i>
+                        خالص فروش
+                    </p>
                 </div>
             </div>
 
-            <!-- بهترین‌ها -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value"><?= htmlspecialchars(($bests['product']['product_name'] ?? '-') . ' (' . number_format($bests['product']['q'] ?? 0) . ' عدد)') ?></div>
-                    <div class="stat-label">پرفروش‌ترین محصول</div>
+            <!-- Best Performers -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 print-break">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-crown text-yellow-500 ml-2"></i>
+                        پرفروش‌ترین محصول
+                    </h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-2xl font-bold text-gray-800">
+                                <?= htmlspecialchars($bests['product']['product_name'] ?? '---') ?>
+                            </p>
+                            <p class="text-gray-600 text-sm mt-1">
+                                <?= number_format($bests['product']['q'] ?? 0) ?> عدد فروش
+                            </p>
+                        </div>
+                        <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-star text-yellow-600 text-2xl"></i>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value"><?= htmlspecialchars($bests['buyer']['name'] ?? '-') ?></div>
-                    <div class="stat-label">بهترین مشتری</div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-trophy text-blue-500 ml-2"></i>
+                        بهترین مشتری
+                    </h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xl font-bold text-gray-800">
+                                <?= htmlspecialchars($bests['buyer']['name'] ?? '---') ?>
+                            </p>
+                            <p class="text-gray-600 text-sm mt-1">
+                                <?= number_format($bests['buyer']['s'] ?? 0) ?> ریال خرید
+                            </p>
+                        </div>
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user text-blue-600 text-2xl"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- فرم فیلتر -->
-            <form method="get" class="filter-form" id="filterForm">
-                <div>
-                    <input type="text" name="from" placeholder="از تاریخ (مثال: 1404/01/01)" 
-                           value="<?= htmlspecialchars($from) ?>" pattern="\d{4}/\d{2}/\d{2}">
-                    <input type="text" name="to" placeholder="تا تاریخ (مثال: 1404/12/29)" 
-                           value="<?= htmlspecialchars($to) ?>" pattern="\d{4}/\d{2}/\d{2}">
-                    
-                    <select name="buyer_id">
-                        <option value="">همه مشتری‌ها</option>
-                        <?php 
-                        $buyers = $conn->query("SELECT id, name FROM buyers ORDER BY name");
-                        foreach($buyers as $b): 
-                        ?>
-                            <option value="<?= $b['id'] ?>" <?= $buyer_id == $b['id'] ? "selected" : "" ?>>
-                                <?= htmlspecialchars($b['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+            <!-- Filter Form -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 no-print">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-filter text-gray-600 ml-2"></i>
+                    فیلترهای پیشرفته
+                </h3>
+                <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">از تاریخ</label>
+                        <input type="text" name="from" value="<?= htmlspecialchars($from) ?>" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="1403/01/01">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">تا تاریخ</label>
+                        <input type="text" name="to" value="<?= htmlspecialchars($to) ?>" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="1403/12/29">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">مشتری</label>
+                        <select name="buyer_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">همه مشتری‌ها</option>
+                            <?php 
+                            $buyers = $conn->query("SELECT id, name FROM buyers ORDER BY name");
+                            foreach($buyers as $b): 
+                            ?>
+                                <option value="<?= $b['id'] ?>" <?= $buyer_id == $b['id'] ? "selected" : "" ?>>
+                                    <?= htmlspecialchars($b['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">محصول</label>
+                        <select name="product" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">همه محصولات</option>
+                            <?php 
+                            $products = $conn->query("SELECT DISTINCT product_name FROM purchases ORDER BY product_name");
+                            foreach($products as $pr): 
+                            ?>
+                                <option value="<?= htmlspecialchars($pr['product_name']) ?>" 
+                                    <?= $product == $pr['product_name'] ? "selected" : "" ?>>
+                                    <?= htmlspecialchars($pr['product_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-4 flex gap-3 justify-end">
+                        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center">
+                            <i class="fas fa-filter ml-2"></i>
+                            اعمال فیلتر
+                        </button>
+                        <button type="button" onclick="clearFilters()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition flex items-center">
+                            <i class="fas fa-times ml-2"></i>
+                            پاک کردن
+                        </button>
+                    </div>
+                </form>
+            </div>
 
-                    <select name="product">
-                        <option value="">همه محصولات</option>
-                        <?php 
-                        $products = $conn->query("SELECT DISTINCT product_name FROM purchases ORDER BY product_name");
-                        foreach($products as $pr): 
-                        ?>
-                            <option value="<?= htmlspecialchars($pr['product_name']) ?>" 
-                                <?= $product == $pr['product_name'] ? "selected" : "" ?>>
-                                <?= htmlspecialchars($pr['product_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-
-                    <button type="submit">
-                        <i class="fas fa-filter"></i> اعمال فیلتر
-                    </button>
-                    <button type="button" onclick="clearFilters()">
-                        <i class="fas fa-times"></i> پاک کردن
-                    </button>
-                </div>
-            </form>
-
-            <!-- گزارش روزانه -->
-            
-            <!-- گزارش ماهانه -->
-            <section>
-                <h3><i class="fas fa-calendar-alt"></i> گزارش ماهانه</h3>
-                <div class="table-responsive">
-                    <table class="report-table">
-                        <thead>
+            <!-- Monthly Report -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 print-break print-full">
+                <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-calendar-alt text-green-600 ml-2"></i>
+                    گزارش ماهانه فروش
+                </h3>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm text-right">
+                        <thead class="bg-gray-50">
                             <tr>
-                                <th>ماه</th>
-                                <th>تعداد فروش</th>
-                                <th>مبلغ کل (ریال)</th>
-                                <th>پرداختی‌ها</th>
-                                <th>مانده حساب</th>
-                                <th>درصد تسویه</th>
-                                <th>محصول برتر(ماه)</th>
-                                <th>نام خریدار</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">ماه</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">تعداد فروش</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">مبلغ کل</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">پرداختی‌ها</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">مانده حساب</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">درصد تسویه</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">محصول برتر</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">مشتری برتر</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-200">
                             <?php if (empty($monthlyReport)): ?>
                                 <tr>
-                                    <td colspan="8" style="text-align: center; color: #666;">
+                                    <td colspan="8" class="p-8 text-center text-gray-500">
+                                        <i class="fas fa-inbox text-4xl mb-4 block"></i>
                                         هیچ داده‌ای برای نمایش وجود ندارد
                                     </td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach($monthlyReport as $month => $info): ?>
-                                    <tr class="<?= $info['qty'] < 20 ? 'low-sales' : '' ?>">
-                                        <td><strong><?= $month ?></strong></td>
-                                        <td><?= number_format($info['qty']) ?></td>
-                                        <td><?= number_format($info['price']) ?></td>
-                                        <td><?= number_format($info['payments']) ?></td>
-                                        <td>
-                                            <span style="color: <?= $info['balance'] > 0 ? '#d00' : '#0a0' ?>">
-                                                <?= number_format($info['balance']) ?>
-                                            </span>
+                                    <tr class="hover:bg-gray-50 transition <?= $info['qty'] < 20 ? 'bg-yellow-50' : '' ?>">
+                                        <td class="p-4 font-medium"><?= $month ?></td>
+                                        <td class="p-4"><?= number_format($info['qty']) ?></td>
+                                        <td class="p-4 font-medium"><?= number_format($info['price']) ?> ریال</td>
+                                        <td class="p-4 text-green-600"><?= number_format($info['payments']) ?> ریال</td>
+                                        <td class="p-4 font-medium <?= $info['balance'] > 0 ? 'text-red-600' : 'text-green-600' ?>">
+                                            <?= number_format($info['balance']) ?> ریال
                                         </td>
-                                        <td>
-                                            <div style="background: #e0e0e0; border-radius: 10px; height: 20px;">
-                                                <div style="background: <?= $info['percentPaid'] >= 80 ? '#28a745' : ($info['percentPaid'] >= 50 ? '#ffc107' : '#dc3545') ?>;
-                                                     width: <?= min($info['percentPaid'], 100) ?>%; height: 100%; border-radius: 10px; text-align: center; color: white; font-size: 12px; line-height: 20px;">
-                                                    <?= $info['percentPaid'] ?>%
+                                        <td class="p-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                                    <div class="progress-bar h-2 rounded-full <?= $info['percentPaid'] >= 80 ? 'bg-green-500' : ($info['percentPaid'] >= 50 ? 'bg-yellow-500' : 'bg-red-500') ?>" 
+                                                         style="width: <?= min($info['percentPaid'], 100) ?>%"></div>
                                                 </div>
+                                                <span class="text-sm font-medium w-12"><?= $info['percentPaid'] ?>%</span>
                                             </div>
                                         </td>
-                                        <td><strong><?= htmlspecialchars($info['topProduct']) ?></strong></td>
-                                        <td><strong><?= htmlspecialchars($info['topCustomer']) ?></strong></td>
+                                        <td class="p-4">
+                                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                                <?= htmlspecialchars($info['topProduct']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="p-4">
+                                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                                <?= htmlspecialchars($info['topCustomer']) ?>
+                                            </span>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
 
-            <!-- گزارش پرداختی‌های کاربران -->
-            <section>
-                <h3><i class="fas fa-money-bill-wave"></i> گزارش پرداختی‌های کاربران</h3>
-                <div class="table-responsive">
-                    <table class="report-table">
-                        <thead>
+            <!-- User Payments Report -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 print-break print-full">
+                <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-money-bill-wave text-purple-600 ml-2"></i>
+                    گزارش پرداختی‌های مشتریان
+                </h3>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm text-right">
+                        <thead class="bg-gray-50">
                             <tr>
-                                <th>نام مشتری</th>
-                                <th>مجموع پرداختی‌ها (ریال)</th>
-                                <th>تعداد پرداختی‌ها</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">نام مشتری</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">مجموع پرداختی‌ها</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">تعداد پرداختی‌ها</th>
+                                <th class="p-4 font-medium text-gray-700 border-b">میانگین هر پرداخت</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-200">
                             <?php if (empty($userPayments)): ?>
                                 <tr>
-                                    <td colspan="3" style="text-align: center; color: #666;">
+                                    <td colspan="4" class="p-8 text-center text-gray-500">
+                                        <i class="fas fa-inbox text-4xl mb-4 block"></i>
                                         هیچ داده‌ای برای نمایش وجود ندارد
                                     </td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach($userPayments as $payment): ?>
-                                    <tr>
-                                        <td><strong><?= htmlspecialchars($payment['buyer_name']) ?></strong></td>
-                                        <td><?= number_format($payment['total_payments']) ?></td>
-                                        <td><?= number_format($payment['payment_count']) ?></td>
+                                    <tr class="hover:bg-gray-50 transition">
+                                        <td class="p-4 font-medium"><?= htmlspecialchars($payment['buyer_name']) ?></td>
+                                        <td class="p-4 text-green-600 font-medium"><?= number_format($payment['total_payments']) ?> ریال</td>
+                                        <td class="p-4"><?= number_format($payment['payment_count']) ?></td>
+                                        <td class="p-4 text-blue-600">
+                                            <?= number_format($payment['total_payments'] / max($payment['payment_count'], 1)) ?> ریال
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
 
-            <!-- نمودارها -->
-            <section>
-                <h3><i class="fas fa-chart-line"></i> نمودار تحلیلی</h3>
-                <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0; height: 96vh">
-                    <canvas id="salesChart" ></canvas>
+            <!-- Charts -->
+            <div class="no-print">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-chart-line text-red-600 ml-2"></i>
+                        نمودار تحلیلی فروش
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="salesChart"></canvas>
+                    </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- دکمه‌های خروجی -->
-            <div style="text-align: center; margin: 30px 0;">
-                <button onclick="downloadCSV()" class="btn-primary">
-                    <i class="fas fa-download"></i> دانلود گزارش CSV
+            <!-- Action Buttons -->
+            <div class="flex gap-4 justify-center no-print">
+                <button onclick="downloadCSV()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition flex items-center">
+                    <i class="fas fa-download ml-2"></i>
+                    دانلود گزارش CSV
                 </button>
-                <button onclick="window.print()" class="btn-secondary">
-                    <i class="fas fa-print"></i> چاپ گزارش
+                <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center">
+                    <i class="fas fa-print ml-2"></i>
+                    چاپ گزارش
                 </button>
             </div>
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // نمودار فروش
@@ -655,23 +751,26 @@ $product = $_GET['product'] ?? '';
                     {
                         label: 'تعداد فروش',
                         data: quantities,
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        yAxisID: 'y',
-                        tension: 0.3
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true
                     },
                     {
                         label: 'درآمد (ریال)',
                         data: revenues,
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        yAxisID: 'y1',
-                        tension: 0.3
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true
                     }
                 ]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 interaction: {
                     mode: 'index',
                     intersect: false,
@@ -680,25 +779,56 @@ $product = $_GET['product'] ?? '';
                     x: {
                         title: {
                             display: true,
-                            text: 'ماه'
+                            text: 'ماه',
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn',
+                                size: 12
+                            }
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn'
+                            }
                         }
                     },
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
                         title: {
                             display: true,
-                            text: 'تعداد فروش'
+                            text: 'تعداد فروش',
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn',
+                                size: 12
+                            }
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn'
+                            }
                         }
                     },
                     y1: {
-                        type: 'linear',
-                        display: true,
                         position: 'right',
                         title: {
                             display: true,
-                            text: 'درآمد (ریال)'
+                            text: 'درآمد (ریال)',
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn',
+                                size: 12
+                            }
+                        },
+                        ticks: {
+                            color: '#6b7280',
+                            font: {
+                                family: 'Vazirmatn'
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('fa-IR').format(value);
+                            }
                         },
                         grid: {
                             drawOnChartArea: false,
@@ -708,10 +838,22 @@ $product = $_GET['product'] ?? '';
                 plugins: {
                     legend: {
                         position: 'top',
-                        rtl: true
+                        rtl: true,
+                        labels: {
+                            font: {
+                                family: 'Vazirmatn'
+                            },
+                            color: '#374151'
+                        }
                     },
                     tooltip: {
                         rtl: true,
+                        bodyFont: {
+                            family: 'Vazirmatn'
+                        },
+                        titleFont: {
+                            family: 'Vazirmatn'
+                        },
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -765,11 +907,11 @@ $product = $_GET['product'] ?? '';
             document.querySelector('input[name="to"]').value = '';
             document.querySelector('select[name="buyer_id"]').value = '';
             document.querySelector('select[name="product"]').value = '';
-            document.getElementById('filterForm').submit();
+            document.querySelector('form').submit();
         }
 
         // اعتبارسنجی فرم
-        document.getElementById('filterForm').addEventListener('submit', function(e) {
+        document.querySelector('form').addEventListener('submit', function(e) {
             const from = document.querySelector('input[name="from"]').value;
             const to = document.querySelector('input[name="to"]').value;
             
